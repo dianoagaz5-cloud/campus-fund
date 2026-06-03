@@ -14,7 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      loan_requests: {
+        Row: {
+          address: string | null
+          age: number
+          created_at: string
+          field_of_study: string | null
+          first_name: string
+          guarantee: string | null
+          guarantee_photo_url: string | null
+          honor_declaration: boolean | null
+          id: string
+          id_doc_number: string | null
+          id_doc_type: string | null
+          id_photo_url: string | null
+          interest_rate: number
+          last_name: string
+          loan_amount: number
+          person_photo_url: string | null
+          profession: string | null
+          repayment_amount: number | null
+          request_date: string | null
+          signature_url: string | null
+          status: string
+          user_email: string | null
+          whatsapp_number: string
+        }
+        Insert: {
+          address?: string | null
+          age: number
+          created_at?: string
+          field_of_study?: string | null
+          first_name: string
+          guarantee?: string | null
+          guarantee_photo_url?: string | null
+          honor_declaration?: boolean | null
+          id?: string
+          id_doc_number?: string | null
+          id_doc_type?: string | null
+          id_photo_url?: string | null
+          interest_rate?: number
+          last_name: string
+          loan_amount: number
+          person_photo_url?: string | null
+          profession?: string | null
+          repayment_amount?: number | null
+          request_date?: string | null
+          signature_url?: string | null
+          status?: string
+          user_email?: string | null
+          whatsapp_number: string
+        }
+        Update: {
+          address?: string | null
+          age?: number
+          created_at?: string
+          field_of_study?: string | null
+          first_name?: string
+          guarantee?: string | null
+          guarantee_photo_url?: string | null
+          honor_declaration?: boolean | null
+          id?: string
+          id_doc_number?: string | null
+          id_doc_type?: string | null
+          id_photo_url?: string | null
+          interest_rate?: number
+          last_name?: string
+          loan_amount?: number
+          person_photo_url?: string | null
+          profession?: string | null
+          repayment_amount?: number | null
+          request_date?: string | null
+          signature_url?: string | null
+          status?: string
+          user_email?: string | null
+          whatsapp_number?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
