@@ -9,15 +9,28 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UserSpaceRouteImport } from './routes/user-space'
 import { Route as TestimonialsRouteImport } from './routes/testimonials'
+import { Route as LoanApplicationRouteImport } from './routes/loan-application'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as EligibilityRouteImport } from './routes/eligibility'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
+const UserSpaceRoute = UserSpaceRouteImport.update({
+  id: '/user-space',
+  path: '/user-space',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TestimonialsRoute = TestimonialsRouteImport.update({
   id: '/testimonials',
   path: '/testimonials',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanApplicationRoute = LoanApplicationRouteImport.update({
+  id: '/loan-application',
+  path: '/loan-application',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -35,6 +48,11 @@ const ContactRoute = ContactRouteImport.update({
   path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,49 +61,100 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/contact': typeof ContactRoute
   '/eligibility': typeof EligibilityRoute
   '/faq': typeof FaqRoute
+  '/loan-application': typeof LoanApplicationRoute
   '/testimonials': typeof TestimonialsRoute
+  '/user-space': typeof UserSpaceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/contact': typeof ContactRoute
   '/eligibility': typeof EligibilityRoute
   '/faq': typeof FaqRoute
+  '/loan-application': typeof LoanApplicationRoute
   '/testimonials': typeof TestimonialsRoute
+  '/user-space': typeof UserSpaceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/contact': typeof ContactRoute
   '/eligibility': typeof EligibilityRoute
   '/faq': typeof FaqRoute
+  '/loan-application': typeof LoanApplicationRoute
   '/testimonials': typeof TestimonialsRoute
+  '/user-space': typeof UserSpaceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/contact' | '/eligibility' | '/faq' | '/testimonials'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/contact'
+    | '/eligibility'
+    | '/faq'
+    | '/loan-application'
+    | '/testimonials'
+    | '/user-space'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/contact' | '/eligibility' | '/faq' | '/testimonials'
-  id: '__root__' | '/' | '/contact' | '/eligibility' | '/faq' | '/testimonials'
+  to:
+    | '/'
+    | '/admin'
+    | '/contact'
+    | '/eligibility'
+    | '/faq'
+    | '/loan-application'
+    | '/testimonials'
+    | '/user-space'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/contact'
+    | '/eligibility'
+    | '/faq'
+    | '/loan-application'
+    | '/testimonials'
+    | '/user-space'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   ContactRoute: typeof ContactRoute
   EligibilityRoute: typeof EligibilityRoute
   FaqRoute: typeof FaqRoute
+  LoanApplicationRoute: typeof LoanApplicationRoute
   TestimonialsRoute: typeof TestimonialsRoute
+  UserSpaceRoute: typeof UserSpaceRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/user-space': {
+      id: '/user-space'
+      path: '/user-space'
+      fullPath: '/user-space'
+      preLoaderRoute: typeof UserSpaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/testimonials': {
       id: '/testimonials'
       path: '/testimonials'
       fullPath: '/testimonials'
       preLoaderRoute: typeof TestimonialsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan-application': {
+      id: '/loan-application'
+      path: '/loan-application'
+      fullPath: '/loan-application'
+      preLoaderRoute: typeof LoanApplicationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -109,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -121,10 +197,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   ContactRoute: ContactRoute,
   EligibilityRoute: EligibilityRoute,
   FaqRoute: FaqRoute,
+  LoanApplicationRoute: LoanApplicationRoute,
   TestimonialsRoute: TestimonialsRoute,
+  UserSpaceRoute: UserSpaceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
