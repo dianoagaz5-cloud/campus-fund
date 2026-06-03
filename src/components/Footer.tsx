@@ -12,7 +12,7 @@ export function Footer() {
           Accessibilité • Confiance • Organisation Professionnelle
         </p>
         <p className="text-xs text-white/50 mt-4">
-          © 2024 CampusFund — Tous droits réservés
+          © 2026 CampusFund — Tous droits réservés
         </p>
       </div>
     </footer>

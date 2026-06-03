@@ -38,13 +38,7 @@ export function Navbar() {
               </Link>
             );
           })}
-          <Link
-            to="/admin"
-            className="text-sm font-medium flex items-center gap-1.5"
-            style={{ color: path === "/admin" ? "#c9a84c" : "rgba(255,255,255,0.7)" }}
-          >
-            <Settings className="w-4 h-4" /> Admin
-          </Link>
+
           <Link
             to="/loan-application"
             className="ml-2 px-5 py-2 rounded-full text-sm font-semibold transition-transform hover:scale-105"
@@ -77,14 +71,7 @@ export function Navbar() {
                 {l.label}
               </Link>
             ))}
-            <Link
-              to="/admin"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-1.5 text-base"
-              style={{ color: path === "/admin" ? "#c9a84c" : "rgba(255,255,255,0.7)" }}
-            >
-              <Settings className="w-4 h-4" /> Admin
-            </Link>
+
             <Link
               to="/loan-application"
               onClick={() => setOpen(false)}

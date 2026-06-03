@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { LogOut, MessageCircle, Mail, Clock, AlertTriangle } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, WHATSAPP_URL, SUPPORT_EMAIL } from "@/lib/supabase-helpers";
+import { formatFCFA, WHATSAPP_URL, SUPPORT_EMAIL, checkIsAdmin } from "@/lib/supabase-helpers";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/user-space")({
@@ -13,6 +13,7 @@ export const Route = createFileRoute("/user-space")({
 });
 
 type LocalUser = { firstName: string; email: string; whatsapp: string };
+
 type Loan = {
   id: string; loan_amount: number; repayment_amount: number; created_at: string;
   status: "pending" | "approved" | "rejected" | "reimbursed"; request_date: string;
@@ -20,12 +21,57 @@ type Loan = {
 
 function UserSpace() {
   const [user, setUser] = useState<LocalUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const raw = localStorage.getItem("cf_user");
-    if (raw) setUser(JSON.parse(raw));
-  }, []);
+    // Vérifier si un utilisateur est déjà connecté via Supabase
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const uEmail = session.user.email || "";
+        setUser({
+          firstName: session.user.user_metadata.first_name || uEmail.split("@")[0],
+          email: uEmail,
+          whatsapp: session.user.user_metadata.whatsapp || "",
+        });
+        checkIsAdmin(uEmail).then((res) => {
+          setIsAdmin(res);
+          if (res) {
+            sessionStorage.setItem("cf_admin", "1");
+            navigate({ to: "/admin" });
+          }
+        });
+      }
+    });
+
+    // Écouter les changements d'état d'authentification
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const uEmail = session.user.email || "";
+        setUser({
+          firstName: session.user.user_metadata.first_name || uEmail.split("@")[0],
+          email: uEmail,
+          whatsapp: session.user.user_metadata.whatsapp || "",
+        });
+        checkIsAdmin(uEmail).then((res) => {
+          setIsAdmin(res);
+          if (res) {
+            sessionStorage.setItem("cf_admin", "1");
+            navigate({ to: "/admin" });
+          }
+        });
+      } else {
+        setUser(null);
+        setIsAdmin(false);
+        sessionStorage.removeItem("cf_admin");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
 
   useEffect(() => {
     if (!user) return;
@@ -35,7 +81,10 @@ function UserSpace() {
 
   if (!user) return <AuthScreen onLogin={setUser} />;
 
-  const logout = () => { localStorage.removeItem("cf_user"); setUser(null); };
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
   const active = loans.filter((l) => l.status === "pending" || l.status === "approved");
   const history = loans.filter((l) => l.status === "rejected" || l.status === "reimbursed");
 
@@ -47,9 +96,19 @@ function UserSpace() {
             <p className="text-sm" style={{ color: "#c9a84c" }}>Mon Espace</p>
             <h1 className="text-3xl md:text-4xl font-bold text-[#0d3d2e]">Bonjour {user.firstName} 👋</h1>
           </div>
-          <button onClick={logout} className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#0d3d2e] text-[#0d3d2e] hover:bg-[#0d3d2e] hover:text-white transition-colors text-sm">
-            <LogOut className="w-4 h-4" /> Déconnexion
-          </button>
+          <div className="flex items-center gap-3">
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#0d3d2e] text-[#c9a84c] hover:scale-105 transition-transform text-sm font-semibold"
+              >
+                Espace Admin
+              </Link>
+            )}
+            <button onClick={logout} className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#0d3d2e] text-[#0d3d2e] hover:bg-[#0d3d2e] hover:text-white transition-colors text-sm">
+              <LogOut className="w-4 h-4" /> Déconnexion
+            </button>
+          </div>
         </div>
 
         <Section title="Demandes actives" loans={active} empty="Vous n'avez aucune demande en cours." />
@@ -131,24 +190,76 @@ function AuthScreen({ onLogin }: { onLogin: (u: LocalUser) => void }) {
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !whatsapp || (mode === "signup" && !firstName)) { toast.error("Tous les champs sont requis"); return; }
-    if (mode === "signup") {
-      const u: LocalUser = { firstName, email, whatsapp };
-      localStorage.setItem("cf_user", JSON.stringify(u));
-      onLogin(u);
-      toast.success("Compte créé");
-    } else {
-      // Récupérer le profil enregistré
-      const stored = localStorage.getItem(`cf_profile_${email}`);
-      const profile: LocalUser = stored ? JSON.parse(stored) : { firstName: email.split("@")[0], email, whatsapp };
-      if (profile.whatsapp !== whatsapp) { toast.error("Identifiants invalides"); return; }
-      localStorage.setItem("cf_user", JSON.stringify(profile));
-      onLogin(profile);
+    if (!email || !password || (mode === "signup" && (!firstName || !whatsapp))) {
+      toast.error("Tous les champs sont requis");
+      return;
     }
-    if (mode === "signup") localStorage.setItem(`cf_profile_${email}`, JSON.stringify({ firstName, email, whatsapp }));
+    setLoading(true);
+
+    try {
+      if (mode === "signup") {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              first_name: firstName,
+              whatsapp: whatsapp,
+            }
+          }
+        });
+        if (authError) throw authError;
+
+        if (authData.session) {
+          const uEmail = authData.session.user.email || "";
+          onLogin({
+            firstName,
+            email: uEmail,
+            whatsapp,
+          });
+          toast.success("Compte créé et connecté !");
+          const isAdmin = await checkIsAdmin(uEmail);
+          if (isAdmin) {
+            sessionStorage.setItem("cf_admin", "1");
+            navigate({ to: "/admin" });
+          }
+        } else {
+          toast.success("Inscription réussie ! Veuillez vérifier vos e-mails de confirmation.");
+          setMode("login");
+        }
+      } else {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (authError) throw authError;
+
+        if (authData.session) {
+          const uEmail = authData.session.user.email || "";
+          onLogin({
+            firstName: authData.session.user.user_metadata.first_name || uEmail.split("@")[0],
+            email: uEmail,
+            whatsapp: authData.session.user.user_metadata.whatsapp || "",
+          });
+          toast.success("Connexion réussie !");
+          const isAdmin = await checkIsAdmin(uEmail);
+          if (isAdmin) {
+            sessionStorage.setItem("cf_admin", "1");
+            navigate({ to: "/admin" });
+          }
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Une erreur est survenue");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -169,19 +280,25 @@ function AuthScreen({ onLogin }: { onLogin: (u: LocalUser) => void }) {
           {mode === "signup" && (
             <div>
               <label className="block text-sm font-semibold text-[#0d3d2e] mb-2">Prénom</label>
-              <input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-4 py-3 rounded-xl border" />
+              <input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-4 py-3 rounded-xl border" required />
             </div>
           )}
           <div>
             <label className="block text-sm font-semibold text-[#0d3d2e] mb-2">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border" />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border" required />
           </div>
+          {mode === "signup" && (
+            <div>
+              <label className="block text-sm font-semibold text-[#0d3d2e] mb-2">WhatsApp</label>
+              <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="w-full px-4 py-3 rounded-xl border" required placeholder="+229 ..." />
+            </div>
+          )}
           <div>
-            <label className="block text-sm font-semibold text-[#0d3d2e] mb-2">WhatsApp</label>
-            <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="w-full px-4 py-3 rounded-xl border" />
+            <label className="block text-sm font-semibold text-[#0d3d2e] mb-2">Mot de passe</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl border" required />
           </div>
-          <button type="submit" className="w-full px-6 py-3 rounded-full font-semibold" style={{ background: "#0d3d2e", color: "#c9a84c" }}>
-            {mode === "login" ? "Me connecter" : "Créer mon compte"}
+          <button type="submit" disabled={loading} className="w-full px-6 py-3 rounded-full font-semibold transition-transform hover:scale-[1.02] disabled:opacity-50" style={{ background: "#0d3d2e", color: "#c9a84c" }}>
+            {loading ? "Chargement..." : mode === "login" ? "Me connecter" : "Créer mon compte"}
           </button>
         </form>
       </section>

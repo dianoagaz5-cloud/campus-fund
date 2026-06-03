@@ -29,3 +29,11 @@ export function formatFCFA(n: number): string {
 export const WHATSAPP_URL = "https://wa.me/2290150085142";
 export const WHATSAPP_DISPLAY = "+229 01 50 08 51 42";
 export const SUPPORT_EMAIL = "ahihovitale@gmail.com";
+
+export const ADMIN_EMAILS = ["dianoagaz5@gmail.com", "ahihovitale@gmail.com"];
+
+export async function checkIsAdmin(email: string | undefined): Promise<boolean> {
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email);
+}
+

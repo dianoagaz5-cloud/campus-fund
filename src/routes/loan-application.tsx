@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Upload, Loader2, CheckCircle, Shield, MessageCircle, Mail } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
@@ -50,6 +50,20 @@ function LoanApplication() {
   const [data, setData] = useState<FormData>(initial);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) {
+        setData((p) => ({ ...p, user_email: user.email || "" }));
+        if (user.user_metadata?.first_name) {
+          setData((p) => ({ ...p, first_name: user.user_metadata.first_name }));
+        }
+        if (user.user_metadata?.whatsapp) {
+          setData((p) => ({ ...p, whatsapp_number: user.user_metadata.whatsapp }));
+        }
+      }
+    });
+  }, []);
 
   const update = <K extends keyof FormData>(k: K, v: FormData[K]) => setData((p) => ({ ...p, [k]: v }));
 

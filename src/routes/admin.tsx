@@ -1,11 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { LogOut, Download, Search, TrendingUp, Wallet, AlertCircle, BarChart3 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import { PageShell } from "@/components/PageShell";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, getSignedUrl } from "@/lib/supabase-helpers";
+import { formatFCFA, getSignedUrl, checkIsAdmin, ADMIN_EMAILS } from "@/lib/supabase-helpers";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin")({
@@ -13,21 +13,44 @@ export const Route = createFileRoute("/admin")({
   component: Admin,
 });
 
-const CRED = { email: "admin@campusfund.com", password: "campusfund2024" };
+const ADMIN_PASSWORD_FALLBACK = "campusfund2024";
 
 type Loan = any;
 
 function Admin() {
   const [authed, setAuthed] = useState(false);
   const [tab, setTab] = useState<"requests" | "analytics">("requests");
+  const navigate = useNavigate();
 
   useEffect(() => {
-    setAuthed(sessionStorage.getItem("cf_admin") === "1");
+    const checkAuth = async () => {
+      const isSessionAdmin = sessionStorage.getItem("cf_admin") === "1";
+      if (isSessionAdmin) {
+        setAuthed(true);
+        return;
+      }
+
+      // Vérifier si une session Supabase active correspond à un admin
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        const isAdmin = await checkIsAdmin(session.user.email);
+        if (isAdmin) {
+          sessionStorage.setItem("cf_admin", "1");
+          setAuthed(true);
+        }
+      }
+    };
+    checkAuth();
   }, []);
 
   if (!authed) return <Login onOk={() => setAuthed(true)} />;
 
-  const logout = () => { sessionStorage.removeItem("cf_admin"); setAuthed(false); };
+  const logout = async () => {
+    sessionStorage.removeItem("cf_admin");
+    await supabase.auth.signOut();
+    setAuthed(false);
+    navigate({ to: "/" });
+  };
 
   return (
     <PageShell>
@@ -63,20 +86,59 @@ function Admin() {
 function Login({ onOk }: { onOk: () => void }) {
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
-  const submit = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === CRED.email && pwd === CRED.password) {
-      sessionStorage.setItem("cf_admin", "1"); onOk();
-    } else toast.error("Identifiants invalides");
+    setLoading(true);
+    try {
+      // 1. Tenter la connexion via Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: pwd,
+      });
+
+      if (!error && data.session) {
+        const uEmail = data.session.user.email;
+        const isAdmin = await checkIsAdmin(uEmail);
+        if (isAdmin) {
+          sessionStorage.setItem("cf_admin", "1");
+          toast.success("Connexion réussie !");
+          onOk();
+          return;
+        } else {
+          await supabase.auth.signOut();
+          toast.error("Vous n'êtes pas autorisé à accéder à cet espace.");
+          return;
+        }
+      }
+
+      // 2. Repli local (fallback) si Supabase échoue ou n'est pas configuré
+      if (ADMIN_EMAILS.includes(email) && pwd === ADMIN_PASSWORD_FALLBACK) {
+        sessionStorage.setItem("cf_admin", "1");
+        toast.success("Connexion administrateur locale réussie");
+        onOk();
+        return;
+      }
+
+      throw error || new Error("Identifiants invalides");
+    } catch (err: any) {
+      toast.error(err.message || "Identifiants invalides");
+    } finally {
+      setLoading(false);
+    }
   };
+
   return (
     <PageShell>
       <section className="py-20 px-6 max-w-md mx-auto">
         <h1 className="text-3xl font-bold text-center mb-6 text-[#0d3d2e]">Connexion Admin</h1>
         <form onSubmit={submit} className="card-premium p-7 space-y-4">
-          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border" />
-          <input type="password" placeholder="Mot de passe" value={pwd} onChange={(e) => setPwd(e.target.value)} className="w-full px-4 py-3 rounded-xl border" />
-          <button type="submit" className="w-full px-6 py-3 rounded-full font-semibold" style={{ background: "#0d3d2e", color: "#c9a84c" }}>Se connecter</button>
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border" disabled={loading} required />
+          <input type="password" placeholder="Mot de passe" value={pwd} onChange={(e) => setPwd(e.target.value)} className="w-full px-4 py-3 rounded-xl border" disabled={loading} required />
+          <button type="submit" className="w-full px-6 py-3 rounded-full font-semibold disabled:opacity-50" style={{ background: "#0d3d2e", color: "#c9a84c" }} disabled={loading}>
+            {loading ? "Connexion..." : "Se connecter"}
+          </button>
         </form>
       </section>
     </PageShell>

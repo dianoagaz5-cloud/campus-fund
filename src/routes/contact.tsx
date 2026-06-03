@@ -37,7 +37,7 @@ function Contact() {
             </div>
             <h3 className="text-xl font-bold mb-2 text-[#0d3d2e]">WhatsApp</h3>
             <p className="text-[#6b7280] mb-3">Réponse la plus rapide.</p>
-            <p className="font-semibold text-[#0d3d2e]">{WHATSAPP_DISPLAY}</p>
+            <p className="font-semibold text-[#0d3d2e]">Discuter avec un conseiller</p>
           </motion.a>
 
           <motion.a
@@ -51,7 +51,7 @@ function Contact() {
             </div>
             <h3 className="text-xl font-bold mb-2 text-[#0d3d2e]">Email</h3>
             <p className="text-[#6b7280] mb-3">Pour les demandes détaillées.</p>
-            <p className="font-semibold text-[#0d3d2e]">{SUPPORT_EMAIL}</p>
+            <p className="font-semibold text-[#0d3d2e]">Nous envoyer un e-mail</p>
           </motion.a>
         </motion.div>
 
