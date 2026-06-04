@@ -75,8 +75,28 @@ function UserSpace() {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("loan_requests").select("*").eq("user_email", user.email).order("created_at", { ascending: false })
-      .then(({ data }) => setLoans((data as any) || []));
+    
+    const loadLoans = () => {
+      supabase.from("loan_requests").select("*").eq("user_email", user.email).order("created_at", { ascending: false })
+        .then(({ data }) => setLoans((data as any) || []));
+    };
+
+    loadLoans();
+
+    const channel = supabase
+      .channel(`user-loans-changes-${user.email}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "loan_requests" },
+        () => {
+          loadLoans();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   if (!user) return <AuthScreen onLogin={setUser} />;

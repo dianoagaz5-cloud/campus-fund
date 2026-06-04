@@ -160,7 +160,22 @@ function RequestsTab() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = () => supabase.from("loan_requests").select("*").order("created_at", { ascending: false }).then(({ data }) => setLoans((data as any) || []));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("admin-loan-requests-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "loan_requests" },
+        () => {
+          load();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const filtered = useMemo(() => loans.filter((l) => {
     const okStatus = status === "all" || l.status === status;
@@ -374,7 +389,23 @@ function PhotoThumb({ path, label }: { path?: string; label: string }) {
 
 function AnalyticsTab() {
   const [loans, setLoans] = useState<Loan[]>([]);
-  useEffect(() => { supabase.from("loan_requests").select("*").then(({ data }) => setLoans((data as any) || [])); }, []);
+  const load = () => supabase.from("loan_requests").select("*").then(({ data }) => setLoans((data as any) || []));
+  useEffect(() => {
+    load();
+    const channel = supabase
+      .channel("admin-analytics-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "loan_requests" },
+        () => {
+          load();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const stats = useMemo(() => {
     const total = loans.length;
@@ -479,6 +510,32 @@ function CapitalTab() {
 
   useEffect(() => {
     loadData();
+    const loanChannel = supabase
+      .channel("admin-capital-loans-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "loan_requests" },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
+    const settingsChannel = supabase
+      .channel("admin-capital-settings-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "capital_settings" },
+        () => {
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(loanChannel);
+      supabase.removeChannel(settingsChannel);
+    };
   }, []);
 
   const handleSaveCapital = async (e: React.FormEvent) => {
