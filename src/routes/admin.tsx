@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
-import { LogOut, Download, Search, TrendingUp, Wallet, AlertCircle, BarChart3 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { LogOut, Download, Search, TrendingUp, Wallet, AlertCircle, BarChart3, Trash2, ChevronDown } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import { PageShell } from "@/components/PageShell";
 import { supabase } from "@/integrations/supabase/client";
@@ -178,6 +178,14 @@ function RequestsTab() {
     load();
   };
 
+  const deleteLoan = async (id: string) => {
+    if (!window.confirm("Voulez-vous vraiment supprimer définitivement cette demande ? Cette action est irréversible.")) return;
+    const { error } = await supabase.from("loan_requests").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Demande supprimée avec succès");
+    load();
+  };
+
   return (
     <>
       <div className="card-premium p-4 mb-5 flex flex-wrap gap-3 items-center">
@@ -199,7 +207,7 @@ function RequestsTab() {
 
       <div className="space-y-3">
         {filtered.map((l) => (
-          <LoanRow key={l.id} loan={l} expanded={expanded === l.id} onToggle={() => setExpanded(expanded === l.id ? null : l.id)} onStatusChange={setLoanStatus} />
+          <LoanRow key={l.id} loan={l} expanded={expanded === l.id} onToggle={() => setExpanded(expanded === l.id ? null : l.id)} onStatusChange={setLoanStatus} onDelete={deleteLoan} />
         ))}
         {filtered.length === 0 && <div className="card-premium p-8 text-center text-[#6b7280]">Aucune demande</div>}
       </div>
@@ -214,13 +222,13 @@ const STATUS_META: Record<string, { l: string; bg: string; fg: string }> = {
   reimbursed: { l: "Remboursé", bg: "#dbeafe", fg: "#1e40af" },
 };
 
-function LoanRow({ loan, expanded, onToggle, onStatusChange }: { loan: Loan; expanded: boolean; onToggle: () => void; onStatusChange: (id: string, s: string) => void }) {
+function LoanRow({ loan, expanded, onToggle, onStatusChange, onDelete }: { loan: Loan; expanded: boolean; onToggle: () => void; onStatusChange: (id: string, s: string) => void; onDelete: (id: string) => void }) {
   const s = STATUS_META[loan.status];
   return (
-    <motion.div layout className="card-premium overflow-hidden">
-      <button onClick={onToggle} className="w-full p-5 flex items-center justify-between gap-4 text-left">
+    <motion.div layout className="card-premium overflow-hidden border border-gray-100/50 hover:border-gray-200 transition-all duration-300">
+      <button onClick={onToggle} className="w-full p-5 flex items-center justify-between gap-4 text-left hover:bg-[#fcfbf9]/50 transition-colors">
         <div className="flex items-center gap-4 flex-1 min-w-0">
-          <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{ background: "#0d3d2e" }}>
+          <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold shrink-0 shadow-sm" style={{ background: "#0d3d2e" }}>
             {loan.first_name?.[0]}{loan.last_name?.[0]}
           </div>
           <div className="min-w-0">
@@ -228,52 +236,89 @@ function LoanRow({ loan, expanded, onToggle, onStatusChange }: { loan: Loan; exp
             <div className="text-xs text-[#6b7280]">{new Date(loan.created_at).toLocaleDateString("fr-FR")} · {loan.whatsapp_number}</div>
           </div>
         </div>
-        <div className="font-bold text-[#0d3d2e] hidden sm:block">{formatFCFA(loan.loan_amount)}</div>
-        <span className="px-3 py-1 rounded-full text-xs font-semibold shrink-0" style={{ background: s.bg, color: s.fg }}>{s.l}</span>
+        <div className="flex items-center gap-4">
+          <div className="font-bold text-[#0d3d2e] hidden sm:block">{formatFCFA(loan.loan_amount)}</div>
+          <span className="px-3 py-1 rounded-full text-xs font-semibold shrink-0" style={{ background: s.bg, color: s.fg }}>{s.l}</span>
+          <motion.div
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="text-[#6b7280] shrink-0"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </motion.div>
+        </div>
       </button>
 
-      {expanded && (
-        <div className="p-5 border-t border-gray-100 grid md:grid-cols-2 gap-5 text-sm">
-          <div className="space-y-2">
-            <Field label="Âge" value={loan.age} />
-            <Field label="Filière" value={loan.field_of_study} />
-            <Field label="Profession" value={loan.profession} />
-            <Field label="Adresse" value={loan.address} />
-            <Field label="Doc identité" value={`${loan.id_doc_type} · ${loan.id_doc_number}`} />
-            <Field label="Email" value={loan.user_email || "—"} />
-          </div>
-          <div className="space-y-2">
-            <Field label="Montant prêté" value={formatFCFA(loan.loan_amount)} />
-            <Field label="À rembourser" value={formatFCFA(loan.repayment_amount)} />
-            <Field label="Date demande" value={loan.request_date} />
-            <Field label="Garantie" value={loan.guarantee} />
-          </div>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="p-5 border-t border-[#f4f0e8] grid md:grid-cols-2 gap-6 text-sm bg-[#faf8f5]/30">
+              <div className="space-y-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-[#6b7280] mb-2">Informations personnelles</h4>
+                <Field label="Âge" value={loan.age} />
+                <Field label="Filière" value={loan.field_of_study} />
+                <Field label="Profession" value={loan.profession} />
+                <Field label="Adresse" value={loan.address} />
+                <Field label="Doc identité" value={`${loan.id_doc_type} · ${loan.id_doc_number}`} />
+                <Field label="Email" value={loan.user_email || "—"} />
+              </div>
+              <div className="space-y-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+                <div>
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-[#6b7280] mb-2">Détails du prêt</h4>
+                  <Field label="Montant prêté" value={formatFCFA(loan.loan_amount)} />
+                  <Field label="À rembourser" value={formatFCFA(loan.repayment_amount)} />
+                  <Field label="Date demande" value={loan.request_date} />
+                  <Field label="Garantie" value={loan.guarantee} />
+                </div>
+              </div>
 
-          <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[["id_photo_url", "Identité"], ["person_photo_url", "Personne"], ["guarantee_photo_url", "Garantie"], ["signature_url", "Signature"]].map(([k, l]) => (
-              <PhotoThumb key={k} path={loan[k]} label={l} />
-            ))}
-          </div>
+              <div className="md:col-span-2 space-y-2 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-[#6b7280] mb-2">Pièces jointes</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[["id_photo_url", "Identité"], ["person_photo_url", "Personne"], ["guarantee_photo_url", "Garantie"], ["signature_url", "Signature"]].map(([k, l]) => (
+                    <PhotoThumb key={k} path={loan[k]} label={l} />
+                  ))}
+                </div>
+              </div>
 
-          <div className="md:col-span-2 flex flex-wrap gap-2 pt-3 border-t">
-            {loan.status === "pending" && (
-              <>
-                <button onClick={() => onStatusChange(loan.id, "approved")} className="px-4 py-2 rounded-full text-sm font-semibold text-white" style={{ background: "#16a34a" }}>Approuver</button>
-                <button onClick={() => onStatusChange(loan.id, "rejected")} className="px-4 py-2 rounded-full text-sm font-semibold text-white" style={{ background: "#dc2626" }}>Rejeter</button>
-              </>
-            )}
-            {loan.status === "approved" && (
-              <>
-                <button onClick={() => onStatusChange(loan.id, "reimbursed")} className="px-4 py-2 rounded-full text-sm font-semibold text-white" style={{ background: "#2563eb" }}>Marquer remboursé</button>
-                <button onClick={() => onStatusChange(loan.id, "rejected")} className="px-4 py-2 rounded-full text-sm font-semibold text-white" style={{ background: "#dc2626" }}>Rejeter</button>
-              </>
-            )}
-            {(loan.status === "rejected" || loan.status === "reimbursed") && (
-              <span className="text-xs text-[#6b7280] italic">Demande clôturée</span>
-            )}
-          </div>
-        </div>
-      )}
+              <div className="md:col-span-2 flex flex-wrap gap-2 pt-4 border-t border-[#f4f0e8] items-center justify-between">
+                <div className="flex flex-wrap gap-2">
+                  {loan.status === "pending" && (
+                    <>
+                      <button onClick={() => onStatusChange(loan.id, "approved")} className="px-5 py-2.5 rounded-full text-sm font-semibold text-white bg-[#16a34a] hover:bg-[#15803d] transition-colors shadow-sm shadow-emerald-100">Approuver</button>
+                      <button onClick={() => onStatusChange(loan.id, "rejected")} className="px-5 py-2.5 rounded-full text-sm font-semibold text-white bg-[#dc2626] hover:bg-[#b91c1c] transition-colors shadow-sm shadow-red-100">Rejeter</button>
+                    </>
+                  )}
+                  {loan.status === "approved" && (
+                    <>
+                      <button onClick={() => onStatusChange(loan.id, "reimbursed")} className="px-5 py-2.5 rounded-full text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] transition-colors shadow-sm shadow-blue-100">Marquer remboursé</button>
+                      <button onClick={() => onStatusChange(loan.id, "rejected")} className="px-5 py-2.5 rounded-full text-sm font-semibold text-white bg-[#dc2626] hover:bg-[#b91c1c] transition-colors shadow-sm shadow-red-100">Rejeter</button>
+                    </>
+                  )}
+                  {(loan.status === "rejected" || loan.status === "reimbursed") && (
+                    <span className="text-sm font-medium text-[#6b7280] bg-gray-100 px-3 py-1.5 rounded-full">Demande clôturée</span>
+                  )}
+                </div>
+
+                {(loan.status === "rejected" || loan.status === "reimbursed") && (
+                  <button
+                    onClick={() => onDelete(loan.id)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors border border-red-200"
+                  >
+                    <Trash2 className="w-4 h-4" /> Supprimer la demande
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
