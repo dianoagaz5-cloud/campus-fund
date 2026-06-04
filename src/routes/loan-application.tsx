@@ -225,7 +225,12 @@ function UploadField({ value, onChange, folder, label }: { value: string; onChan
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handle = async (f: File) => {
-    if (f.size > 5 * 1024 * 1024) { toast.error("Fichier > 5 Mo"); return; }
+    const isImage = f.type.startsWith("image/");
+    const limit = isImage ? 25 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (f.size > limit) {
+      toast.error(isImage ? "Image trop volumineuse (max 25 Mo)" : "Fichier trop volumineux (max 5 Mo)");
+      return;
+    }
     setPreview(URL.createObjectURL(f));
     setLoading(true);
     try {

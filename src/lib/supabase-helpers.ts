@@ -28,12 +28,21 @@ async function compressImage(file: File): Promise<File> {
 }
 
 export async function uploadFile(file: File, folder: string): Promise<string> {
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("Fichier trop volumineux (max 5 Mo)");
+  const isImage = file.type.startsWith("image/");
+  
+  // Limite initiale : 25 Mo pour les images (qui seront compressées), 5 Mo pour les autres fichiers (PDFs, etc.)
+  const initialLimit = isImage ? 25 * 1024 * 1024 : 5 * 1024 * 1024;
+  if (file.size > initialLimit) {
+    throw new Error(isImage ? "Image trop volumineuse (max 25 Mo)" : "Fichier trop volumineux (max 5 Mo)");
   }
 
   // Compresser l'image avant upload
   const processedFile = await compressImage(file);
+
+  // Vérifier la taille finale après compression
+  if (processedFile.size > 5 * 1024 * 1024) {
+    throw new Error("Le fichier dépasse encore la limite de 5 Mo après compression");
+  }
 
   const ext = file.name.split(".").pop() || "jpg";
   const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;

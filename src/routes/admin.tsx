@@ -670,7 +670,7 @@ function CapitalTab() {
         <div className="card-premium p-6 flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-[#0d3d2e] text-lg mb-4">Capital actuel</h3>
-            <form onSubmit={handleSaveCapital} className="flex gap-2 mb-4">
+            <form onSubmit={handleSaveCapital} className="flex flex-col sm:flex-row gap-2 mb-4">
               <input
                 type="number"
                 placeholder="Renseignez le capital actuel disponible..."
@@ -681,7 +681,7 @@ function CapitalTab() {
               />
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#0d3d2e] hover:bg-[#0a2f23] transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#0d3d2e] hover:bg-[#0a2f23] transition-colors whitespace-nowrap"
                 disabled={loading}
               >
                 Enregistrer
@@ -700,7 +700,7 @@ function CapitalTab() {
         <div className="card-premium p-6 flex flex-col justify-between">
           <div>
             <h3 className="font-bold text-[#0d3d2e] text-lg mb-4">Objectif de capital</h3>
-            <form onSubmit={handleSaveObjectif} className="flex gap-2 mb-4">
+            <form onSubmit={handleSaveObjectif} className="flex flex-col sm:flex-row gap-2 mb-4">
               <input
                 type="number"
                 placeholder="Renseignez l'objectif à atteindre..."
@@ -711,7 +711,7 @@ function CapitalTab() {
               />
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#0d3d2e] hover:bg-[#0a2f23] transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#0d3d2e] hover:bg-[#0a2f23] transition-colors whitespace-nowrap"
                 disabled={loading}
               >
                 Enregistrer
