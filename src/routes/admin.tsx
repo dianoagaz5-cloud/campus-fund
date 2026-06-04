@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { LogOut, Download, Search, TrendingUp, Wallet, AlertCircle, BarChart3, Trash2, ChevronDown } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
+import { LogOut, Download, Search, TrendingUp, Wallet, AlertCircle, BarChart3, Trash2, ChevronDown, User, Users } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 import { PageShell } from "@/components/PageShell";
 import { supabase } from "@/integrations/supabase/client";
 import { formatFCFA, getSignedUrl, checkIsAdmin, ADMIN_EMAILS } from "@/lib/supabase-helpers";
@@ -19,7 +19,7 @@ type Loan = any;
 
 function Admin() {
   const [authed, setAuthed] = useState(false);
-  const [tab, setTab] = useState<"requests" | "analytics">("requests");
+  const [tab, setTab] = useState<"requests" | "analytics" | "capital">("requests");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -69,6 +69,7 @@ function Admin() {
           {([
             { k: "requests", l: "Demandes" },
             { k: "analytics", l: "Analytics" },
+            { k: "capital", l: "Capital" },
           ] as const).map((t) => (
             <button key={t.k} onClick={() => setTab(t.k)} className="px-5 py-2 rounded-full text-sm font-semibold transition-all"
               style={{ background: tab === t.k ? "#0d3d2e" : "#f4f0e8", color: tab === t.k ? "#c9a84c" : "#6b7280" }}>
@@ -77,7 +78,13 @@ function Admin() {
           ))}
         </div>
 
-        {tab === "requests" ? <RequestsTab /> : <AnalyticsTab />}
+        {tab === "requests" ? (
+          <RequestsTab />
+        ) : tab === "analytics" ? (
+          <AnalyticsTab />
+        ) : (
+          <CapitalTab />
+        )}
       </section>
     </PageShell>
   );
@@ -418,6 +425,365 @@ function Kpi({ icon: Icon, label, value }: { icon: any; label: string; value: st
     <div className="card-premium p-5">
       <div className="flex items-center gap-2 text-[#6b7280] text-xs uppercase mb-2"><Icon className="w-4 h-4" /> {label}</div>
       <div className="text-xl font-bold text-[#0d3d2e]" style={{ fontFamily: "var(--font-display)" }}>{value}</div>
+    </div>
+  );
+}
+
+function CapitalTab() {
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [settings, setSettings] = useState({ capital_actuel: 0, objectif_capital: 0 });
+  const [inputCapital, setInputCapital] = useState("");
+  const [inputObjectif, setInputObjectif] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data: loanData } = await supabase.from("loan_requests").select("*");
+      setLoans(loanData || []);
+
+      const { data: settingsData } = await supabase.from("capital_settings").select("*").eq("id", "default").maybeSingle();
+      if (settingsData) {
+        setSettings({
+          capital_actuel: Number(settingsData.capital_actuel),
+          objectif_capital: Number(settingsData.objectif_capital),
+        });
+        setInputCapital(String(settingsData.capital_actuel));
+        setInputObjectif(String(settingsData.objectif_capital));
+      }
+    } catch (err: any) {
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSaveCapital = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = Number(inputCapital);
+    if (isNaN(val) || val < 0) {
+      toast.error("Veuillez saisir un montant valide.");
+      return;
+    }
+    const { error } = await supabase.from("capital_settings").upsert({ id: "default", capital_actuel: val });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Capital actuel enregistré");
+      loadData();
+    }
+  };
+
+  const handleSaveObjectif = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = Number(inputObjectif);
+    if (isNaN(val) || val < 0) {
+      toast.error("Veuillez saisir un montant valide.");
+      return;
+    }
+    const { error } = await supabase.from("capital_settings").upsert({ id: "default", objectif_capital: val });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Objectif de capital enregistré");
+      loadData();
+    }
+  };
+
+  const Capital_Actuel = settings.capital_actuel;
+  const Objectif_Capital = settings.objectif_capital;
+
+  const Total_Prete = useMemo(() => {
+    return loans.filter((l) => l.status !== "rejected").reduce((s, l) => s + Number(l.loan_amount || 0), 0);
+  }, [loans]);
+
+  const Total_Rembourse = useMemo(() => {
+    return loans.filter((l) => l.status === "reimbursed").reduce((s, l) => s + Number(l.repayment_amount || 0), 0);
+  }, [loans]);
+
+  const Prets_En_Cours = useMemo(() => {
+    return loans.filter((l) => l.status === "approved").reduce((s, l) => s + Number(l.loan_amount || 0), 0);
+  }, [loans]);
+
+  const Benefices_Nets = useMemo(() => {
+    return loans.filter((l) => l.status === "reimbursed").reduce((s, l) => s + Number(l.loan_amount || 0) * 0.3, 0);
+  }, [loans]);
+
+  const progressPercent = useMemo(() => {
+    if (Objectif_Capital <= 0) return 0;
+    return Math.min((Capital_Actuel / Objectif_Capital) * 100, 100);
+  }, [Capital_Actuel, Objectif_Capital]);
+
+  const lineChartData = useMemo(() => {
+    const months = [
+      { name: "Avril", index: 3 },
+      { name: "Mai", index: 4 },
+      { name: "Juin", index: 5 },
+      { name: "Juillet", index: 6 },
+      { name: "Août", index: 7 },
+      { name: "Septembre", index: 8 },
+      { name: "Octobre", index: 9 },
+      { name: "Novembre", index: 10 },
+      { name: "Décembre", index: 11 },
+    ];
+
+    const loansByMonth = months.map((m) => {
+      const monthLoans = loans.filter((l) => {
+        const d = new Date(l.created_at);
+        return d.getMonth() === m.index && d.getFullYear() === 2026;
+      });
+
+      const lent = monthLoans.filter((l) => l.status !== "rejected").reduce((s, l) => s + Number(l.loan_amount || 0), 0);
+      const repaid = monthLoans.filter((l) => l.status === "reimbursed").reduce((s, l) => s + Number(l.repayment_amount || 0), 0);
+      const activeRepayments = monthLoans.filter((l) => l.status === "approved").reduce((s, l) => s + Number(l.repayment_amount || 0), 0);
+
+      return { mIndex: m.index, name: m.name, lent, repaid, activeRepayments };
+    });
+
+    const values: Record<number, number> = {};
+    values[5] = Capital_Actuel;
+
+    for (let i = 4; i >= 3; i--) {
+      const nextMonthData = loansByMonth.find((m) => m.mIndex === i + 1);
+      const repaidNext = nextMonthData ? nextMonthData.repaid : 0;
+      const lentNext = nextMonthData ? nextMonthData.lent : 0;
+      values[i] = Math.max(0, values[i + 1] - repaidNext + lentNext);
+    }
+
+    for (let i = 6; i <= 11; i++) {
+      const prevVal = values[i - 1];
+      
+      let activeRepaidProjection = 0;
+      if (i === 6) {
+        const juneData = loansByMonth.find((m) => m.mIndex === 5);
+        activeRepaidProjection = juneData ? juneData.activeRepayments : 0;
+      }
+
+      const gapToGoal = Math.max(0, Objectif_Capital - prevVal);
+      const organicGrowth = gapToGoal * 0.15;
+
+      values[i] = Math.round(prevVal + activeRepaidProjection + organicGrowth);
+    }
+
+    return months.map((m) => ({
+      name: m.name,
+      "Capital réel / projeté": values[m.index] || 0,
+      "Objectif cible": Objectif_Capital,
+    }));
+  }, [loans, Capital_Actuel, Objectif_Capital]);
+
+  const barChartData = useMemo(() => {
+    return [
+      {
+        name: "Flux",
+        "Capital prêté": Total_Prete,
+        "Capital remboursé": Total_Rembourse,
+      }
+    ];
+  }, [Total_Prete, Total_Rembourse]);
+
+  return (
+    <div className="space-y-8 animate-fadeIn">
+      {/* Bloc 1 : Saisie et Paramétrage */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Section Capital Actuel */}
+        <div className="card-premium p-6 flex flex-col justify-between">
+          <div>
+            <h3 className="font-bold text-[#0d3d2e] text-lg mb-4">Capital actuel</h3>
+            <form onSubmit={handleSaveCapital} className="flex gap-2 mb-4">
+              <input
+                type="number"
+                placeholder="Renseignez le capital actuel disponible..."
+                value={inputCapital}
+                onChange={(e) => setInputCapital(e.target.value)}
+                className="flex-1 px-4 py-2 rounded-xl border text-sm focus:outline-none focus:ring-1 focus:ring-[#0d3d2e]"
+                disabled={loading}
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#0d3d2e] hover:bg-[#0a2f23] transition-colors"
+                disabled={loading}
+              >
+                Enregistrer
+              </button>
+            </form>
+          </div>
+          <div>
+            <span className="text-xs uppercase text-[#6b7280]">Capital actuel disponible</span>
+            <div className="text-3xl font-extrabold text-[#0d3d2e] mt-1">
+              {formatFCFA(Capital_Actuel)}
+            </div>
+          </div>
+        </div>
+
+        {/* Section Objectif de Capital */}
+        <div className="card-premium p-6 flex flex-col justify-between">
+          <div>
+            <h3 className="font-bold text-[#0d3d2e] text-lg mb-4">Objectif de capital</h3>
+            <form onSubmit={handleSaveObjectif} className="flex gap-2 mb-4">
+              <input
+                type="number"
+                placeholder="Renseignez l'objectif à atteindre..."
+                value={inputObjectif}
+                onChange={(e) => setInputObjectif(e.target.value)}
+                className="flex-1 px-4 py-2 rounded-xl border text-sm focus:outline-none focus:ring-1 focus:ring-[#0d3d2e]"
+                disabled={loading}
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#0d3d2e] hover:bg-[#0a2f23] transition-colors"
+                disabled={loading}
+              >
+                Enregistrer
+              </button>
+            </form>
+          </div>
+          <div>
+            <span className="text-xs uppercase text-[#6b7280]">Cible à atteindre</span>
+            <div className="text-3xl font-extrabold text-[#c9a84c] mt-1">
+              {formatFCFA(Objectif_Capital)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bloc 2 : Bilan Financier */}
+      <div className="card-premium p-6">
+        <h3 className="font-bold text-[#0d3d2e] text-lg mb-4">Bilan Financier</h3>
+        <div className="divide-y divide-gray-100">
+          <div className="flex justify-between py-3">
+            <span className="text-[#6b7280]">Capital de départ renseigné</span>
+            <span className="font-semibold text-[#111827]">{formatFCFA(Capital_Actuel)}</span>
+          </div>
+          <div className="flex justify-between py-3">
+            <span className="text-[#6b7280]">Total prêté (hors refusés)</span>
+            <span className="font-semibold text-[#c9a84c]">{formatFCFA(Total_Prete)}</span>
+          </div>
+          <div className="flex justify-between py-3">
+            <span className="text-[#6b7280]">Total remboursé + intérêts</span>
+            <span className="font-semibold text-[#16a34a]">{formatFCFA(Total_Rembourse)}</span>
+          </div>
+          <div className="flex justify-between py-3">
+            <span className="text-[#6b7280]">Prêts en cours (risque)</span>
+            <span className="font-semibold text-[#dc2626]">{formatFCFA(Prets_En_Cours)}</span>
+          </div>
+          <div className="flex justify-between py-3">
+            <span className="text-[#6b7280]">Bénéfices nets (intérêts)</span>
+            <span className="font-semibold text-[#7c3aed]">{formatFCFA(Benefices_Nets)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bloc 3 : Suivi de l'Objectif et Graphique */}
+      <div className="card-premium p-6 space-y-6">
+        <div>
+          <h3 className="font-bold text-[#0d3d2e] text-lg mb-2">Suivi de l'Objectif</h3>
+          <div className="flex justify-between text-sm text-[#6b7280] mb-2">
+            <span>Objectif {formatFCFA(Objectif_Capital)}</span>
+            <span className="font-bold text-[#0d3d2e]">{progressPercent.toFixed(1)}%</span>
+          </div>
+          <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
+            <div
+              className="bg-[#0d3d2e] h-full rounded-full transition-all duration-500"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="pt-4 border-t border-gray-100">
+          <h4 className="font-bold text-sm text-[#0d3d2e] mb-4">Graphique de croissance et projections</h4>
+          <div className="w-full h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={lineChartData} margin={{ left: 10, right: 10, top: 10, bottom: 20 }}>
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tickFormatter={(v) => `${v / 1000}k`} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: any) => formatFCFA(Number(v))} />
+                <Line
+                  type="monotone"
+                  dataKey="Capital réel / projeté"
+                  stroke="#16a34a"
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                  name="Capital projeté"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Objectif cible"
+                  stroke="#c9a84c"
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={false}
+                  name={`Objectif ${formatFCFA(Objectif_Capital)}`}
+                />
+                <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: "15px" }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Bloc 4 : Répartition des bénéfices nets */}
+      <div className="card-premium p-6 space-y-6">
+        <h3 className="font-bold text-[#0d3d2e] text-lg">Répartition des bénéfices nets</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Carte 1 */}
+          <div className="bg-[#faf8f5]/40 border border-gray-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
+            <div className="w-12 h-12 rounded-full bg-[#0d3d2e]/10 flex items-center justify-center text-[#0d3d2e]">
+              <User className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-xs text-[#6b7280] font-medium">Vous - 50%</div>
+              <div className="text-lg font-bold text-[#0d3d2e]">{formatFCFA(Benefices_Nets * 0.50)}</div>
+            </div>
+          </div>
+          {/* Carte 2 */}
+          <div className="bg-[#faf8f5]/40 border border-gray-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
+            <div className="w-12 h-12 rounded-full bg-[#c9a84c]/10 flex items-center justify-center text-[#c9a84c]">
+              <Users className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-xs text-[#6b7280] font-medium">Associé - 20%</div>
+              <div className="text-lg font-bold text-[#c9a84c]">{formatFCFA(Benefices_Nets * 0.20)}</div>
+            </div>
+          </div>
+          {/* Carte 3 */}
+          <div className="bg-[#faf8f5]/40 border border-gray-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
+            <div className="w-12 h-12 rounded-full bg-[#7c3aed]/10 flex items-center justify-center text-[#7c3aed]">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-xs text-[#6b7280] font-medium">Réinvesti - 30%</div>
+              <div className="text-lg font-bold text-[#7c3aed]">{formatFCFA(Benefices_Nets * 0.30)}</div>
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-[#6b7280] text-center pt-2">
+          Calculé sur {formatFCFA(Benefices_Nets)} de bénéfices nets générés
+        </p>
+      </div>
+
+      {/* Bloc 5 : Graphique de comparaison des Flux */}
+      <div className="card-premium p-6">
+        <h3 className="font-bold text-[#0d3d2e] text-lg mb-6">Comparaison des Flux Financiers</h3>
+        <div className="w-full h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={barChartData} margin={{ left: 10, right: 10, top: 10, bottom: 10 }}>
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={(v) => `${v / 1000}k`} tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v: any) => formatFCFA(Number(v))} />
+              <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: "20px" }} />
+              <Bar dataKey="Capital prêté" fill="#0d3d2e" radius={[8, 8, 0, 0]} maxBarSize={60} />
+              <Bar dataKey="Capital remboursé" fill="#c9a84c" radius={[8, 8, 0, 0]} maxBarSize={60} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }

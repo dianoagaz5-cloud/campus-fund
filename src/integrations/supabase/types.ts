@@ -92,6 +92,30 @@ export type Database = {
         }
         Relationships: []
       }
+      capital_settings: {
+        Row: {
+          id: string
+          capital_actuel: number
+          objectif_capital: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          capital_actuel?: number
+          objectif_capital?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          capital_actuel?: number
+          objectif_capital?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
