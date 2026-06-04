@@ -1,21 +1,63 @@
 import { supabase } from "@/integrations/supabase/client";
+import imageCompression from "browser-image-compression";
 
 export const BUCKET = "campusfund-uploads";
+
+/**
+ * Compresse une image côté client avant upload pour accélérer le transfert.
+ * Réduit la taille à max 800px de largeur et max 300 Ko.
+ */
+async function compressImage(file: File): Promise<File> {
+  // Ne compresser que les images
+  if (!file.type.startsWith("image/")) return file;
+
+  const options = {
+    maxSizeMB: 0.3, // 300 Ko max
+    maxWidthOrHeight: 1200,
+    useWebWorker: true,
+    initialQuality: 0.7,
+  };
+
+  try {
+    const compressed = await imageCompression(file, options);
+    return compressed;
+  } catch {
+    // En cas d'échec de compression, renvoyer le fichier original
+    return file;
+  }
+}
 
 export async function uploadFile(file: File, folder: string): Promise<string> {
   if (file.size > 5 * 1024 * 1024) {
     throw new Error("Fichier trop volumineux (max 5 Mo)");
   }
+
+  // Compresser l'image avant upload
+  const processedFile = await compressImage(file);
+
   const ext = file.name.split(".").pop() || "jpg";
   const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    cacheControl: "3600",
+  const { error } = await supabase.storage.from(BUCKET).upload(path, processedFile, {
+    cacheControl: "31536000", // Cache 1 an (les fichiers ne changent pas)
     upsert: false,
   });
   if (error) throw error;
   return path;
 }
 
+/**
+ * Retourne l'URL publique directe du fichier (plus rapide que signed URL).
+ * Fonctionne car le bucket est public.
+ */
+export function getPublicUrl(path: string): string | null {
+  if (!path) return null;
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data?.publicUrl ?? null;
+}
+
+/**
+ * @deprecated Utiliser getPublicUrl() pour de meilleures performances
+ */
 export async function getSignedUrl(path: string, expires = 3600): Promise<string | null> {
   if (!path) return null;
   const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, expires);
@@ -36,4 +78,3 @@ export async function checkIsAdmin(email: string | undefined): Promise<boolean> 
   if (!email) return false;
   return ADMIN_EMAILS.includes(email);
 }
-

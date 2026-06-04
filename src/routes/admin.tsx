@@ -5,8 +5,9 @@ import { LogOut, Download, Search, TrendingUp, Wallet, AlertCircle, BarChart3, T
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 import { PageShell } from "@/components/PageShell";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, getSignedUrl, checkIsAdmin, ADMIN_EMAILS } from "@/lib/supabase-helpers";
+import { formatFCFA, getPublicUrl, checkIsAdmin, ADMIN_EMAILS } from "@/lib/supabase-helpers";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — CampusFund" }] }),
@@ -168,14 +169,33 @@ function RequestsTab() {
     return okStatus && okSearch;
   }), [loans, status, search]);
 
-  const exportCSV = () => {
-    const headers = ["id", "first_name", "last_name", "age", "whatsapp", "loan_amount", "repayment_amount", "status", "created_at", "email"];
-    const rows = loans.map((l) => [l.id, l.first_name, l.last_name, l.age, l.whatsapp_number, l.loan_amount, l.repayment_amount, l.status, l.created_at, l.user_email].join(","));
-    const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "campusfund_demandes.csv"; a.click();
-    URL.revokeObjectURL(url);
+  const exportExcel = () => {
+    const data = loans.map((l) => ({
+      "ID": l.id,
+      "Prénom": l.first_name,
+      "Nom": l.last_name,
+      "Âge": l.age,
+      "WhatsApp": l.whatsapp_number,
+      "Montant prêté (FCFA)": l.loan_amount,
+      "À rembourser (FCFA)": l.repayment_amount,
+      "Statut": l.status === "pending" ? "En attente" : l.status === "approved" ? "Approuvé" : l.status === "rejected" ? "Rejeté" : "Remboursé",
+      "Date demande": l.request_date || "",
+      "Date création": new Date(l.created_at).toLocaleDateString("fr-FR"),
+      "Email": l.user_email || "",
+      "Filière": l.field_of_study || "",
+      "Profession": l.profession || "",
+      "Adresse": l.address || "",
+      "Garantie": l.guarantee || "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    // Ajuster la largeur des colonnes
+    ws["!cols"] = Object.keys(data[0] || {}).map((key) => ({
+      wch: Math.max(key.length, ...data.map((r: any) => String(r[key] || "").length).slice(0, 20)) + 2
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Demandes");
+    XLSX.writeFile(wb, `campusfund_demandes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success("Fichier Excel téléchargé");
   };
 
   const setLoanStatus = async (id: string, newStatus: string) => {
@@ -207,8 +227,8 @@ function RequestsTab() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#6b7280]" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher par nom…" className="w-full pl-9 pr-4 py-2 rounded-xl border text-sm" />
         </div>
-        <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold" style={{ background: "#c9a84c", color: "#0d3d2e" }}>
-          <Download className="w-4 h-4" /> Export CSV
+        <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold" style={{ background: "#c9a84c", color: "#0d3d2e" }}>
+          <Download className="w-4 h-4" /> Export Excel
         </button>
       </div>
 
@@ -340,13 +360,12 @@ function Field({ label, value }: { label: string; value: any }) {
 }
 
 function PhotoThumb({ path, label }: { path?: string; label: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => { if (path) getSignedUrl(path).then(setUrl); }, [path]);
+  const url = path ? getPublicUrl(path) : null;
   if (!path) return <div className="aspect-square rounded-xl bg-gray-100 flex items-center justify-center text-xs text-[#6b7280]">{label}<br />—</div>;
   return (
     <a href={url || "#"} target="_blank" rel="noopener" className="block">
       <div className="aspect-square rounded-xl overflow-hidden bg-gray-100">
-        {url ? <img src={url} alt={label} className="w-full h-full object-cover" /> : <div className="w-full h-full animate-pulse" />}
+        {url ? <img src={url} alt={label} className="w-full h-full object-cover" loading="lazy" /> : <div className="w-full h-full animate-pulse" />}
       </div>
       <div className="text-xs text-center mt-1 text-[#6b7280]">{label}</div>
     </a>
