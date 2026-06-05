@@ -824,8 +824,8 @@ function CapitalTab() {
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <div className="text-xs text-[#6b7280] font-medium">Associé - 20%</div>
-              <div className="text-lg font-bold text-[#c9a84c]">{formatFCFA(Benefices_Nets * 0.20)}</div>
+              <div className="text-xs text-[#6b7280] font-medium">Associé - 10%</div>
+              <div className="text-lg font-bold text-[#c9a84c]">{formatFCFA(Benefices_Nets * 0.10)}</div>
             </div>
           </div>
           {/* Carte 3 */}
@@ -834,8 +834,8 @@ function CapitalTab() {
               <TrendingUp className="w-6 h-6" />
             </div>
             <div>
-              <div className="text-xs text-[#6b7280] font-medium">Réinvesti - 30%</div>
-              <div className="text-lg font-bold text-[#7c3aed]">{formatFCFA(Benefices_Nets * 0.30)}</div>
+              <div className="text-xs text-[#6b7280] font-medium">Réinvesti - 40%</div>
+              <div className="text-lg font-bold text-[#7c3aed]">{formatFCFA(Benefices_Nets * 0.40)}</div>
             </div>
           </div>
         </div>
