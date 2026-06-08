@@ -5,7 +5,7 @@ import { LogOut, Download, Search, TrendingUp, Wallet, AlertCircle, BarChart3, T
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 import { PageShell } from "@/components/PageShell";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, getPublicUrl, checkIsAdmin, ADMIN_EMAILS } from "@/lib/supabase-helpers";
+import { formatFCFA, getPublicUrl, checkIsAdmin, ADMIN_EMAILS, getRemainingDays, downloadContractPDF } from "@/lib/supabase-helpers";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
@@ -266,6 +266,7 @@ const STATUS_META: Record<string, { l: string; bg: string; fg: string }> = {
 
 function LoanRow({ loan, expanded, onToggle, onStatusChange, onDelete }: { loan: Loan; expanded: boolean; onToggle: () => void; onStatusChange: (id: string, s: string) => void; onDelete: (id: string) => void }) {
   const s = STATUS_META[loan.status];
+  const remaining = loan.status === "approved" ? getRemainingDays(loan.approved_at, loan.created_at) : null;
   return (
     <motion.div layout className="card-premium overflow-hidden border border-gray-100/50 hover:border-gray-200 transition-all duration-300">
       <button onClick={onToggle} className="w-full p-5 flex items-center justify-between gap-4 text-left hover:bg-[#fcfbf9]/50 transition-colors">
@@ -278,8 +279,19 @@ function LoanRow({ loan, expanded, onToggle, onStatusChange, onDelete }: { loan:
             <div className="text-xs text-[#6b7280]">{new Date(loan.created_at).toLocaleDateString("fr-FR")} · {loan.whatsapp_number}</div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="font-bold text-[#0d3d2e] hidden sm:block">{formatFCFA(loan.loan_amount)}</div>
+          {remaining && (
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-semibold hidden sm:inline-block"
+              style={{
+                background: remaining.isOverdue ? "#fee2e2" : "#fffaee",
+                color: remaining.isOverdue ? "#991b1b" : "#5b4413",
+              }}
+            >
+              {remaining.text}
+            </span>
+          )}
           <span className="px-3 py-1 rounded-full text-xs font-semibold shrink-0" style={{ background: s.bg, color: s.fg }}>{s.l}</span>
           <motion.div
             animate={{ rotate: expanded ? 180 : 0 }}
@@ -348,14 +360,22 @@ function LoanRow({ loan, expanded, onToggle, onStatusChange, onDelete }: { loan:
                   )}
                 </div>
 
-                {(loan.status === "rejected" || loan.status === "reimbursed") && (
+                <div className="flex flex-wrap gap-2 items-center">
                   <button
-                    onClick={() => onDelete(loan.id)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors border border-red-200"
+                    onClick={() => downloadContractPDF(loan)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors border border-[#c9a84c] text-[#0d3d2e] hover:bg-[#fdf9f0]"
                   >
-                    <Trash2 className="w-4 h-4" /> Supprimer la demande
+                    <Download className="w-4 h-4" /> Contrat PDF
                   </button>
-                )}
+                  {(loan.status === "rejected" || loan.status === "reimbursed") && (
+                    <button
+                      onClick={() => onDelete(loan.id)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors border border-red-200"
+                    >
+                      <Trash2 className="w-4 h-4" /> Supprimer
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -486,6 +506,15 @@ function CapitalTab() {
   const [inputObjectif, setInputObjectif] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Pourcentages de distribution des bénéfices (dynamiques)
+  const [pctPersonnel, setPctPersonnel] = useState(50);
+  const [pctAssocies, setPctAssocies] = useState(10);
+  const [pctReinvesti, setPctReinvesti] = useState(40);
+  const [inputPctPersonnel, setInputPctPersonnel] = useState("50");
+  const [inputPctAssocies, setInputPctAssocies] = useState("10");
+  const [inputPctReinvesti, setInputPctReinvesti] = useState("40");
+  const [savingPct, setSavingPct] = useState(false);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -494,12 +523,26 @@ function CapitalTab() {
 
       const { data: settingsData } = await supabase.from("capital_settings").select("*").eq("id", "default").maybeSingle();
       if (settingsData) {
+        const sd = settingsData as any;
         setSettings({
-          capital_actuel: Number(settingsData.capital_actuel),
-          objectif_capital: Number(settingsData.objectif_capital),
+          capital_actuel: Number(sd.capital_actuel),
+          objectif_capital: Number(sd.objectif_capital),
         });
-        setInputCapital(String(settingsData.capital_actuel));
-        setInputObjectif(String(settingsData.objectif_capital));
+        setInputCapital(String(sd.capital_actuel));
+        setInputObjectif(String(sd.objectif_capital));
+        // Charger les pourcentages
+        if (sd.pct_personnel != null) {
+          setPctPersonnel(Number(sd.pct_personnel));
+          setInputPctPersonnel(String(sd.pct_personnel));
+        }
+        if (sd.pct_associe != null) {
+          setPctAssocies(Number(sd.pct_associe));
+          setInputPctAssocies(String(sd.pct_associe));
+        }
+        if (sd.pct_reinvesti != null) {
+          setPctReinvesti(Number(sd.pct_reinvesti));
+          setInputPctReinvesti(String(sd.pct_reinvesti));
+        }
       }
     } catch (err: any) {
       toast.error("Erreur lors du chargement des données");
@@ -567,6 +610,38 @@ function CapitalTab() {
     } else {
       toast.success("Objectif de capital enregistré");
       loadData();
+    }
+  };
+
+  const handleSavePercentages = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const p = Number(inputPctPersonnel);
+    const a = Number(inputPctAssocies);
+    const r = Number(inputPctReinvesti);
+    if (isNaN(p) || isNaN(a) || isNaN(r) || p < 0 || a < 0 || r < 0) {
+      toast.error("Veuillez saisir des pourcentages valides.");
+      return;
+    }
+    const total = p + a + r;
+    if (total !== 100) {
+      toast.error(`Le total doit être égal à 100% (actuellement ${total}%)`);
+      return;
+    }
+    setSavingPct(true);
+    const { error } = await supabase.from("capital_settings").upsert({
+      id: "default",
+      pct_personnel: p,
+      pct_associe: a,
+      pct_reinvesti: r,
+    } as any);
+    setSavingPct(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setPctPersonnel(p);
+      setPctAssocies(a);
+      setPctReinvesti(r);
+      toast.success("Pourcentages enregistrés");
     }
   };
 
@@ -806,42 +881,95 @@ function CapitalTab() {
 
       {/* Bloc 4 : Répartition des bénéfices nets */}
       <div className="card-premium p-6 space-y-6">
-        <h3 className="font-bold text-[#0d3d2e] text-lg">Répartition des bénéfices nets</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-bold text-[#0d3d2e] text-lg">Répartition des bénéfices nets</h3>
+          <span className="text-xs text-[#6b7280] bg-gray-100 px-3 py-1 rounded-full">
+            Base : {formatFCFA(Benefices_Nets)}
+          </span>
+        </div>
+
+        {/* Formulaire de modification des pourcentages */}
+        <form onSubmit={handleSavePercentages} className="bg-[#faf8f5] border border-gray-100 rounded-2xl p-4 space-y-3">
+          <div className="text-xs font-semibold text-[#6b7280] uppercase tracking-wide mb-2">Modifier les pourcentages (total = 100%)</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-[#6b7280] mb-1 block">Personnel (%)</label>
+              <input
+                type="number" min="0" max="100"
+                value={inputPctPersonnel}
+                onChange={(e) => setInputPctPersonnel(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-1 focus:ring-[#0d3d2e]"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[#6b7280] mb-1 block">Associés (%)</label>
+              <input
+                type="number" min="0" max="100"
+                value={inputPctAssocies}
+                onChange={(e) => setInputPctAssocies(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-1 focus:ring-[#0d3d2e]"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[#6b7280] mb-1 block">Réinvesti (%)</label>
+              <input
+                type="number" min="0" max="100"
+                value={inputPctReinvesti}
+                onChange={(e) => setInputPctReinvesti(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-1 focus:ring-[#0d3d2e]"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <span className="text-xs" style={{
+              color: (Number(inputPctPersonnel) + Number(inputPctAssocies) + Number(inputPctReinvesti)) === 100 ? "#16a34a" : "#dc2626"
+            }}>
+              Total : {Number(inputPctPersonnel) + Number(inputPctAssocies) + Number(inputPctReinvesti)}%
+              {(Number(inputPctPersonnel) + Number(inputPctAssocies) + Number(inputPctReinvesti)) === 100 ? " ✓" : " (doit être 100%)"}
+            </span>
+            <button
+              type="submit"
+              disabled={savingPct}
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#0d3d2e] hover:bg-[#0a2f23] transition-colors disabled:opacity-50"
+            >
+              {savingPct ? "Enregistrement..." : "Enregistrer"}
+            </button>
+          </div>
+        </form>
+
+        {/* Cartes de résultat */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Carte 1 */}
+          {/* Carte Personnel */}
           <div className="bg-[#faf8f5]/40 border border-gray-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
             <div className="w-12 h-12 rounded-full bg-[#0d3d2e]/10 flex items-center justify-center text-[#0d3d2e]">
               <User className="w-6 h-6" />
             </div>
             <div>
-              <div className="text-xs text-[#6b7280] font-medium">Vous - 50%</div>
-              <div className="text-lg font-bold text-[#0d3d2e]">{formatFCFA(Benefices_Nets * 0.50)}</div>
+              <div className="text-xs text-[#6b7280] font-medium">Vous — {pctPersonnel}%</div>
+              <div className="text-lg font-bold text-[#0d3d2e]">{formatFCFA(Benefices_Nets * pctPersonnel / 100)}</div>
             </div>
           </div>
-          {/* Carte 2 */}
+          {/* Carte Associés */}
           <div className="bg-[#faf8f5]/40 border border-gray-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
             <div className="w-12 h-12 rounded-full bg-[#c9a84c]/10 flex items-center justify-center text-[#c9a84c]">
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <div className="text-xs text-[#6b7280] font-medium">Associé - 10%</div>
-              <div className="text-lg font-bold text-[#c9a84c]">{formatFCFA(Benefices_Nets * 0.10)}</div>
+              <div className="text-xs text-[#6b7280] font-medium">Associés — {pctAssocies}%</div>
+              <div className="text-lg font-bold text-[#c9a84c]">{formatFCFA(Benefices_Nets * pctAssocies / 100)}</div>
             </div>
           </div>
-          {/* Carte 3 */}
+          {/* Carte Réinvestissement */}
           <div className="bg-[#faf8f5]/40 border border-gray-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
             <div className="w-12 h-12 rounded-full bg-[#7c3aed]/10 flex items-center justify-center text-[#7c3aed]">
               <TrendingUp className="w-6 h-6" />
             </div>
             <div>
-              <div className="text-xs text-[#6b7280] font-medium">Réinvesti - 40%</div>
-              <div className="text-lg font-bold text-[#7c3aed]">{formatFCFA(Benefices_Nets * 0.40)}</div>
+              <div className="text-xs text-[#6b7280] font-medium">Réinvesti — {pctReinvesti}%</div>
+              <div className="text-lg font-bold text-[#7c3aed]">{formatFCFA(Benefices_Nets * pctReinvesti / 100)}</div>
             </div>
           </div>
         </div>
-        <p className="text-xs text-[#6b7280] text-center pt-2">
-          Calculé sur {formatFCFA(Benefices_Nets)} de bénéfices nets générés
-        </p>
       </div>
 
       {/* Bloc 5 : Graphique de comparaison des Flux */}

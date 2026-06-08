@@ -17,7 +17,29 @@ const items = [
   { q: "Que se passe-t-il en cas de non-remboursement ?", a: "En cas de non-remboursement, vos informations personnelles seront publiées publiquement sur Facebook, Instagram, Snapchat, Twitter/X et WhatsApp, et la garantie fournie sera saisie." },
   { q: "Comment se passe la récupération des fonds ?", a: "L'endroit et l'heure sont communiqués via WhatsApp. La présence physique est obligatoire — seule la personne dont la photo a été fournie peut récupérer les fonds." },
   { q: "Mes données sont-elles en sécurité ?", a: "Oui. Toutes les données et fichiers sont stockés de manière sécurisée sur notre infrastructure (Supabase) avec accès restreint." },
-  { q: "Comment vous contacter ?", a: "Via WhatsApp au +229 01 50 08 51 42 ou par email à ahihovitale@gmail.com." },
+  {
+    q: "Comment vous contacter ?",
+    a: (
+      <span>
+        Via WhatsApp au{" "}
+        <a
+          href="https://wa.me/2290150085142"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#c9a84c] underline hover:text-[#b0923f] transition-colors font-medium"
+        >
+          +229 01 50 08 51 42
+        </a>{" "}
+        ou par email à{" "}
+        <a
+          href="mailto:ahihovitale@gmail.com"
+          className="text-[#c9a84c] underline hover:text-[#b0923f] transition-colors font-medium"
+        >
+          ahihovitale@gmail.com
+        </a>.
+      </span>
+    ),
+  },
 ];
 
 function FAQ() {

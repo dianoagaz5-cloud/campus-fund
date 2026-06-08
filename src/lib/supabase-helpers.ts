@@ -87,3 +87,239 @@ export async function checkIsAdmin(email: string | undefined): Promise<boolean> 
   if (!email) return false;
   return ADMIN_EMAILS.includes(email);
 }
+
+export function getRemainingDays(startDateStr: string | null | undefined, createdAtStr: string) {
+  const start = startDateStr || createdAtStr;
+  const deadline = new Date(start).getTime() + 14 * 24 * 3600 * 1000;
+  const diff = deadline - Date.now();
+  const isOverdue = diff < 0;
+  const absDiff = Math.abs(diff);
+  const days = Math.floor(absDiff / (24 * 3600 * 1000));
+  const hours = Math.floor((absDiff % (24 * 3600 * 1000)) / (3600 * 1000));
+  
+  if (isOverdue) {
+    return {
+      text: days > 0 ? `Retard ${days}j` : `Retard ${hours}h`,
+      isOverdue: true,
+      days
+    };
+  } else {
+    return {
+      text: days > 0 ? `Reste ${days}j` : `Reste ${hours}h`,
+      isOverdue: false,
+      days
+    };
+  }
+}
+
+export function downloadContractPDF(loan: any) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Veuillez autoriser les popups pour télécharger le contrat.");
+    return;
+  }
+  
+  const formattedAmount = formatFCFA(loan.loan_amount);
+  const formattedRepayment = formatFCFA(loan.loan_amount * 1.3);
+  const fullName = `${loan.first_name} ${loan.last_name}`;
+  const dateStr = loan.request_date ? new Date(loan.request_date).toLocaleDateString("fr-FR") : new Date(loan.created_at || new Date()).toLocaleDateString("fr-FR");
+  const signatureUrl = loan.signature_url ? getPublicUrl(loan.signature_url) : null;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Contrat de Prêt - ${fullName}</title>
+        <style>
+          body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #111827;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 2px solid #0d3d2e;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+          }
+          .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0d3d2e;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+          }
+          .subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 5px;
+          }
+          .section {
+            margin-bottom: 25px;
+          }
+          .article-title {
+            font-weight: bold;
+            color: #0d3d2e;
+            margin-bottom: 5px;
+            font-size: 16px;
+            border-bottom: 1px solid #f4f0e8;
+            padding-bottom: 3px;
+          }
+          .article-body {
+            font-size: 14px;
+            text-align: justify;
+          }
+          .signatures {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+            page-break-inside: avoid;
+          }
+          .signature-box {
+            width: 45%;
+          }
+          .signature-title {
+            font-weight: bold;
+            color: #0d3d2e;
+            font-size: 14px;
+            margin-bottom: 10px;
+          }
+          .signature-line {
+            border-bottom: 1px dashed #6b7280;
+            height: 80px;
+            margin-top: 10px;
+            position: relative;
+          }
+          .signature-img {
+            max-height: 70px;
+            max-width: 100%;
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+          }
+          .metadata {
+            margin-top: 30px;
+            font-size: 12px;
+            color: #6b7280;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 15px;
+          }
+          @media print {
+            body {
+              padding: 20px;
+            }
+            .no-print {
+              display: none;
+            }
+          }
+          .print-btn {
+            display: block;
+            width: 250px;
+            margin: 20px auto;
+            padding: 12px 24px;
+            background-color: #0d3d2e;
+            color: #c9a84c;
+            text-align: center;
+            border: none;
+            border-radius: 9999px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: all 0.2s;
+          }
+          .print-btn:hover {
+            background-color: #0a2f23;
+            transform: translateY(-1px);
+          }
+        </style>
+      </head>
+      <body>
+        <button class="print-btn no-print" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
+        <div class="header">
+          <div class="title">CONTRAT DE PRÊT CAMPUSFUND</div>
+          <div class="subtitle">Référence du prêt : ${loan.id} | Date de signature : ${dateStr}</div>
+        </div>
+        
+        <div class="section">
+          <div class="article-title">ARTICLE 1 — PARTIES AU CONTRAT</div>
+          <div class="article-body">
+            Entre le créancier <strong>CampusFund</strong> et le débiteur <strong>${fullName}</strong>, 
+            âgé(e) de ${loan.age} ans, résidant à ${loan.address || "—"}, 
+            titulaire du document d'identité ${loan.id_doc_type || "—"} sous le numéro ${loan.id_doc_number || "—"}.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="article-title">ARTICLE 2 — MONTANT ET INTÉRÊTS</div>
+          <div class="article-body">
+            Le montant du principal prêté s'élève à <strong>${formattedAmount}</strong>. 
+            Les intérêts sont fixés à un taux de 30% du montant du principal, soit <strong>${formatFCFA(loan.loan_amount * 0.3)}</strong>. 
+            Le montant total dû et exigible au remboursement s'élève à <strong>${formattedRepayment}</strong>.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="article-title">ARTICLE 3 — DURÉE ET REMBOURSEMENT</div>
+          <div class="article-body">
+            La durée du prêt est de <strong>14 jours</strong> (2 semaines) à compter de la date de prise de créance (remise des fonds). 
+            Le remboursement total doit être effectué au plus tard au terme de ce délai.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="article-title">ARTICLE 4 — GARANTIE MATÉRIELLE</div>
+          <div class="article-body">
+            En garantie du remboursement de sa créance, le débiteur a fourni l'objet suivant : 
+            <strong>${loan.guarantee || "—"}</strong>. Le créancier conserve la garde ou les informations relatives à cet objet 
+            jusqu'au remboursement complet.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="article-title">ARTICLE 5 — CLAUSE DE PUBLICATION PUBLIQUE</div>
+          <div class="article-body">
+            En cas de défaut de paiement à l'échéance convenue, le débiteur autorise de manière irrévocable CampusFund 
+            à publier ses données personnelles (identité, photos d'identité et de sa personne, montant restant dû) 
+            sur les réseaux sociaux (Facebook, Instagram, Snapchat, Twitter/X et WhatsApp) afin d'assurer le recouvrement, 
+            et de procéder à la saisie définitive de la garantie matérielle.
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="article-title">ARTICLE 6 — DÉCLARATION SUR L'HONNEUR</div>
+          <div class="article-body">
+            Le débiteur certifie sur l'honneur l'exactitude de toutes les informations fournies dans le cadre de cette demande, 
+            et déclare accepter les termes et conditions du présent contrat.
+          </div>
+        </div>
+
+        <div class="signatures">
+          <div class="signature-box">
+            <div class="signature-title">Le créancier (CampusFund)</div>
+            <div class="signature-line" style="border-bottom: none; display: flex; align-items: flex-end; font-weight: bold; font-size: 20px; color: #0d3d2e; height: 80px;">
+              CAMPUSFUND
+            </div>
+          </div>
+          <div class="signature-box" style="text-align: right;">
+            <div class="signature-title" style="text-align: right;">Le débiteur (${fullName})</div>
+            <div class="signature-line">
+              ${signatureUrl ? `<img class="signature-img" src="${signatureUrl}" alt="Signature" />` : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="metadata">
+          Contrat signé numériquement. Validation par déclaration sur l'honneur.<br>
+          CampusFund — Solution de financement étudiant.
+        </div>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}

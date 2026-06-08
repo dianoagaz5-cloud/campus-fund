@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { LogOut, MessageCircle, Mail, Clock, AlertTriangle } from "lucide-react";
+import { LogOut, MessageCircle, Mail, Clock, AlertTriangle, Download } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, WHATSAPP_URL, SUPPORT_EMAIL, checkIsAdmin } from "@/lib/supabase-helpers";
+import { formatFCFA, WHATSAPP_URL, SUPPORT_EMAIL, checkIsAdmin, getRemainingDays, downloadContractPDF } from "@/lib/supabase-helpers";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/user-space")({
@@ -17,6 +17,9 @@ type LocalUser = { firstName: string; email: string; whatsapp: string };
 type Loan = {
   id: string; loan_amount: number; repayment_amount: number; created_at: string;
   status: "pending" | "approved" | "rejected" | "reimbursed"; request_date: string;
+  approved_at?: string | null; signature_url?: string | null;
+  age?: number; address?: string; id_doc_type?: string; id_doc_number?: string; guarantee?: string;
+  first_name?: string; last_name?: string;
 };
 
 function UserSpace() {
@@ -160,6 +163,7 @@ const STATUS: Record<string, { l: string; bg: string; fg: string }> = {
 
 function LoanCard({ loan }: { loan: Loan }) {
   const s = STATUS[loan.status];
+  const remaining = loan.status === "approved" ? getRemainingDays(loan.approved_at, loan.created_at) : null;
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card-premium p-6">
       <div className="flex justify-between items-start mb-3">
@@ -167,29 +171,52 @@ function LoanCard({ loan }: { loan: Loan }) {
           <div className="text-xs uppercase text-[#6b7280]">Montant prêté</div>
           <div className="text-2xl font-bold text-[#0d3d2e]" style={{ fontFamily: "var(--font-display)" }}>{formatFCFA(loan.loan_amount)}</div>
         </div>
-        <span className="px-3 py-1 rounded-full text-xs font-semibold" style={{ background: s.bg, color: s.fg }}>{s.l}</span>
+        <div className="flex items-center gap-2">
+          {remaining && (
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+              style={{
+                background: remaining.isOverdue ? "#fee2e2" : "#fffaee",
+                color: remaining.isOverdue ? "#991b1b" : "#5b4413",
+              }}
+            >
+              {remaining.text}
+            </span>
+          )}
+          <span className="px-3 py-1 rounded-full text-xs font-semibold" style={{ background: s.bg, color: s.fg }}>{s.l}</span>
+        </div>
       </div>
       <div className="text-sm text-[#6b7280]">À rembourser : <strong className="text-[#0d3d2e]">{formatFCFA(loan.repayment_amount)}</strong></div>
       <div className="text-xs text-[#6b7280] mt-1">Demandé le {new Date(loan.created_at).toLocaleDateString("fr-FR")}</div>
 
-      {loan.status === "approved" && <Countdown createdAt={loan.created_at} />}
+      {loan.status === "approved" && <Countdown approvedAt={loan.approved_at} createdAt={loan.created_at} />}
 
-      <div className="mt-5 pt-4 border-t border-gray-100 flex gap-2">
-        <a href={WHATSAPP_URL} target="_blank" rel="noopener" className="flex-1 text-center px-3 py-2 rounded-full text-xs font-semibold text-white flex items-center justify-center gap-1.5" style={{ background: "#25D366" }}>
-          <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
-        </a>
-        <a href={`mailto:${SUPPORT_EMAIL}`} className="flex-1 text-center px-3 py-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5" style={{ background: "#c9a84c", color: "#0d3d2e" }}>
-          <Mail className="w-3.5 h-3.5" /> Email
-        </a>
+      <div className="mt-5 pt-4 border-t border-gray-100 flex flex-col gap-2">
+        <button
+          onClick={() => downloadContractPDF(loan)}
+          className="w-full text-center px-3 py-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-gray-100 hover:bg-[#fcfbf9] cursor-pointer"
+          style={{ background: "#f4f0e8", color: "#0d3d2e" }}
+        >
+          <Download className="w-3.5 h-3.5" /> Télécharger le contrat (PDF)
+        </button>
+        <div className="flex gap-2">
+          <a href={WHATSAPP_URL} target="_blank" rel="noopener" className="flex-1 text-center px-3 py-2 rounded-full text-xs font-semibold text-white flex items-center justify-center gap-1.5" style={{ background: "#25D366" }}>
+            <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+          </a>
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="flex-1 text-center px-3 py-2 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5" style={{ background: "#c9a84c", color: "#0d3d2e" }}>
+            <Mail className="w-3.5 h-3.5" /> Email
+          </a>
+        </div>
       </div>
     </motion.div>
   );
 }
 
-function Countdown({ createdAt }: { createdAt: string }) {
+function Countdown({ approvedAt, createdAt }: { approvedAt?: string | null; createdAt: string }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []);
-  const deadline = new Date(createdAt).getTime() + 14 * 24 * 3600 * 1000;
+  const start = approvedAt || createdAt;
+  const deadline = new Date(start).getTime() + 14 * 24 * 3600 * 1000;
   const diff = deadline - now;
   const overdue = diff < 0;
   const abs = Math.abs(diff);
