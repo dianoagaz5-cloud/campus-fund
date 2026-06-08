@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, MessageCircle, Mail } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
+import { WHATSAPP_URL, SUPPORT_EMAIL } from "@/lib/supabase-helpers";
 
 export const Route = createFileRoute("/faq")({
   head: () => ({ meta: [{ title: "FAQ — CampusFund" }] }),
@@ -20,24 +21,24 @@ const items = [
   {
     q: "Comment vous contacter ?",
     a: (
-      <span>
-        Via WhatsApp au{" "}
+      <div className="flex flex-col sm:flex-row gap-3 mt-3">
         <a
-          href="https://wa.me/2290150085142"
+          href={WHATSAPP_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[#c9a84c] underline hover:text-[#b0923f] transition-colors font-medium"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#0d3d2e] text-[#c9a84c] hover:bg-[#0a2f23] transition-colors font-semibold text-sm shadow-sm"
         >
-          +229 01 50 08 51 42
-        </a>{" "}
-        ou par email à{" "}
+          <MessageCircle className="w-4 h-4" />
+          Nous écrire sur WhatsApp
+        </a>
         <a
-          href="mailto:ahihovitale@gmail.com"
-          className="text-[#c9a84c] underline hover:text-[#b0923f] transition-colors font-medium"
+          href={`mailto:${SUPPORT_EMAIL}`}
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border-2 border-[#0d3d2e] text-[#0d3d2e] hover:bg-[#0d3d2e]/5 transition-colors font-semibold text-sm"
         >
-          ahihovitale@gmail.com
-        </a>.
-      </span>
+          <Mail className="w-4 h-4" />
+          Envoyer un e-mail
+        </a>
+      </div>
     ),
   },
 ];
@@ -87,7 +88,7 @@ function FAQ() {
                       transition={{ duration: 0.25 }}
                       className="overflow-hidden"
                     >
-                      <p className="px-6 pb-5 text-[#6b7280] leading-relaxed">{item.a}</p>
+                      <div className="px-6 pb-5 text-[#6b7280] leading-relaxed">{item.a}</div>
                     </motion.div>
                   )}
                 </AnimatePresence>
