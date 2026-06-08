@@ -128,15 +128,22 @@ export function downloadContractPDF(loan: any) {
   printWindow.document.write(`
     <html>
       <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Contrat de Prêt - ${fullName}</title>
         <style>
           body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             color: #111827;
             line-height: 1.6;
-            padding: 40px;
+            padding: 20px;
             max-width: 800px;
             margin: 0 auto;
+          }
+          @media (min-width: 640px) {
+            body {
+              padding: 40px;
+            }
           }
           .header {
             text-align: center;
@@ -145,17 +152,27 @@ export function downloadContractPDF(loan: any) {
             margin-bottom: 30px;
           }
           .title {
-            font-size: 24px;
+            font-size: 18px;
             font-weight: bold;
             color: #0d3d2e;
             margin: 0;
             text-transform: uppercase;
             letter-spacing: 1px;
           }
+          @media (min-width: 640px) {
+            .title {
+              font-size: 24px;
+            }
+          }
           .subtitle {
-            font-size: 14px;
+            font-size: 12px;
             color: #6b7280;
             margin-top: 5px;
+          }
+          @media (min-width: 640px) {
+            .subtitle {
+              font-size: 14px;
+            }
           }
           .section {
             margin-bottom: 25px;
@@ -164,37 +181,53 @@ export function downloadContractPDF(loan: any) {
             font-weight: bold;
             color: #0d3d2e;
             margin-bottom: 5px;
-            font-size: 16px;
+            font-size: 14px;
             border-bottom: 1px solid #f4f0e8;
             padding-bottom: 3px;
           }
+          @media (min-width: 640px) {
+            .article-title {
+              font-size: 16px;
+            }
+          }
           .article-body {
-            font-size: 14px;
+            font-size: 13px;
             text-align: justify;
           }
+          @media (min-width: 640px) {
+            .article-body {
+              font-size: 14px;
+            }
+          }
           .signatures {
-            margin-top: 50px;
+            margin-top: 40px;
             display: flex;
             justify-content: space-between;
             page-break-inside: avoid;
+            gap: 20px;
           }
           .signature-box {
-            width: 45%;
+            width: 48%;
           }
           .signature-title {
             font-weight: bold;
             color: #0d3d2e;
-            font-size: 14px;
+            font-size: 12px;
             margin-bottom: 10px;
+          }
+          @media (min-width: 640px) {
+            .signature-title {
+              font-size: 14px;
+            }
           }
           .signature-line {
             border-bottom: 1px dashed #6b7280;
-            height: 80px;
+            height: 70px;
             margin-top: 10px;
             position: relative;
           }
           .signature-img {
-            max-height: 70px;
+            max-height: 60px;
             max-width: 100%;
             position: absolute;
             bottom: 5px;
@@ -203,11 +236,16 @@ export function downloadContractPDF(loan: any) {
           }
           .metadata {
             margin-top: 30px;
-            font-size: 12px;
+            font-size: 11px;
             color: #6b7280;
             text-align: center;
             border-top: 1px solid #e5e7eb;
             padding-top: 15px;
+          }
+          @media (min-width: 640px) {
+            .metadata {
+              font-size: 12px;
+            }
           }
           @media print {
             body {
@@ -219,8 +257,9 @@ export function downloadContractPDF(loan: any) {
           }
           .print-btn {
             display: block;
-            width: 250px;
-            margin: 20px auto;
+            width: 100%;
+            max-width: 280px;
+            margin: 10px auto 30px auto;
             padding: 12px 24px;
             background-color: #0d3d2e;
             color: #c9a84c;

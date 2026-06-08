@@ -276,7 +276,23 @@ function LoanRow({ loan, expanded, onToggle, onStatusChange, onDelete }: { loan:
           </div>
           <div className="min-w-0">
             <div className="font-semibold text-[#0d3d2e] truncate">{loan.first_name} {loan.last_name}</div>
-            <div className="text-xs text-[#6b7280]">{new Date(loan.created_at).toLocaleDateString("fr-FR")} · {loan.whatsapp_number}</div>
+            <div className="text-xs text-[#6b7280] flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-0.5">
+              <span>{new Date(loan.created_at).toLocaleDateString("fr-FR")}</span>
+              <span>·</span>
+              <span>{loan.whatsapp_number}</span>
+              <span className="sm:hidden font-bold text-[#0d3d2e]">· {formatFCFA(loan.loan_amount)}</span>
+              {remaining && (
+                <span
+                  className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold sm:hidden shrink-0"
+                  style={{
+                    background: remaining.isOverdue ? "#fee2e2" : "#fffaee",
+                    color: remaining.isOverdue ? "#991b1b" : "#5b4413",
+                  }}
+                >
+                  {remaining.text}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
