@@ -163,7 +163,7 @@ const STATUS: Record<string, { l: string; bg: string; fg: string }> = {
 
 function LoanCard({ loan }: { loan: Loan }) {
   const s = STATUS[loan.status];
-  const remaining = loan.status === "approved" ? getRemainingDays(loan.approved_at, loan.created_at) : null;
+  const remaining = loan.status === "approved" ? getRemainingDays(loan.request_date, loan.created_at) : null;
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card-premium p-6">
       <div className="flex justify-between items-start mb-3">
@@ -189,7 +189,7 @@ function LoanCard({ loan }: { loan: Loan }) {
       <div className="text-sm text-[#6b7280]">À rembourser : <strong className="text-[#0d3d2e]">{formatFCFA(loan.repayment_amount)}</strong></div>
       <div className="text-xs text-[#6b7280] mt-1">Demandé le {new Date(loan.created_at).toLocaleDateString("fr-FR")}</div>
 
-      {loan.status === "approved" && <Countdown approvedAt={loan.approved_at} createdAt={loan.created_at} />}
+      {loan.status === "approved" && <Countdown requestDate={loan.request_date} createdAt={loan.created_at} />}
 
       <div className="mt-5 pt-4 border-t border-gray-100 flex flex-col gap-2">
         <button
@@ -212,10 +212,10 @@ function LoanCard({ loan }: { loan: Loan }) {
   );
 }
 
-function Countdown({ approvedAt, createdAt }: { approvedAt?: string | null; createdAt: string }) {
+function Countdown({ requestDate, createdAt }: { requestDate?: string | null; createdAt: string }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []);
-  const start = approvedAt || createdAt;
+  const start = requestDate || createdAt;
   const deadline = new Date(start).getTime() + 14 * 24 * 3600 * 1000;
   const diff = deadline - now;
   const overdue = diff < 0;

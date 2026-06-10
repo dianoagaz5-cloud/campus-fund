@@ -266,7 +266,7 @@ const STATUS_META: Record<string, { l: string; bg: string; fg: string }> = {
 
 function LoanRow({ loan, expanded, onToggle, onStatusChange, onDelete }: { loan: Loan; expanded: boolean; onToggle: () => void; onStatusChange: (id: string, s: string) => void; onDelete: (id: string) => void }) {
   const s = STATUS_META[loan.status];
-  const remaining = loan.status === "approved" ? getRemainingDays(loan.approved_at, loan.created_at) : null;
+  const remaining = loan.status === "approved" ? getRemainingDays(loan.request_date, loan.created_at) : null;
   return (
     <motion.div layout className="card-premium overflow-hidden border border-gray-100/50 hover:border-gray-200 transition-all duration-300">
       <button onClick={onToggle} className="w-full p-5 flex items-center justify-between gap-4 text-left hover:bg-[#fcfbf9]/50 transition-colors">
