@@ -88,26 +88,46 @@ export async function checkIsAdmin(email: string | undefined): Promise<boolean> 
   return ADMIN_EMAILS.includes(email);
 }
 
+export function parseLocalDate(dateStr: string): Date {
+  if (dateStr.includes("T")) {
+    return new Date(dateStr);
+  }
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+  }
+  return new Date(dateStr);
+}
+
 export function getRemainingDays(startDateStr: string | null | undefined, createdAtStr: string) {
   const start = startDateStr || createdAtStr;
-  const deadline = new Date(start).getTime() + 14 * 24 * 3600 * 1000;
-  const diff = deadline - Date.now();
-  const isOverdue = diff < 0;
-  const absDiff = Math.abs(diff);
-  const days = Math.floor(absDiff / (24 * 3600 * 1000));
-  const hours = Math.floor((absDiff % (24 * 3600 * 1000)) / (3600 * 1000));
-  
-  if (isOverdue) {
+  const dateDepart = parseLocalDate(start);
+  dateDepart.setHours(0, 0, 0, 0);
+
+  const dateEcheance = new Date(dateDepart);
+  dateEcheance.setDate(dateDepart.getDate() + 14);
+
+  const aujourdHui = new Date();
+  aujourdHui.setHours(0, 0, 0, 0);
+
+  const differenceEnMs = dateEcheance.getTime() - aujourdHui.getTime();
+  const joursRestants = Math.round(differenceEnMs / (1000 * 60 * 60 * 24));
+
+  if (joursRestants < 0) {
+    const delay = Math.abs(joursRestants);
     return {
-      text: days > 0 ? `Retard ${days}j` : `Retard ${hours}h`,
+      text: `Retard ${delay}j`,
       isOverdue: true,
-      days
+      days: delay
     };
   } else {
     return {
-      text: days > 0 ? `Reste ${days}j` : `Reste ${hours}h`,
+      text: `Reste ${joursRestants}j`,
       isOverdue: false,
-      days
+      days: joursRestants
     };
   }
 }

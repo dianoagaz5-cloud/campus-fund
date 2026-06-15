@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { LogOut, MessageCircle, Mail, Clock, AlertTriangle, Download } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { supabase } from "@/integrations/supabase/client";
-import { formatFCFA, WHATSAPP_URL, SUPPORT_EMAIL, checkIsAdmin, getRemainingDays, downloadContractPDF } from "@/lib/supabase-helpers";
+import { formatFCFA, WHATSAPP_URL, SUPPORT_EMAIL, checkIsAdmin, getRemainingDays, downloadContractPDF, parseLocalDate } from "@/lib/supabase-helpers";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/user-space")({
@@ -216,7 +216,14 @@ function Countdown({ requestDate, createdAt }: { requestDate?: string | null; cr
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(id); }, []);
   const start = requestDate || createdAt;
-  const deadline = new Date(start).getTime() + 14 * 24 * 3600 * 1000;
+  
+  const dateDepart = parseLocalDate(start);
+  dateDepart.setHours(0, 0, 0, 0);
+
+  const dateEcheance = new Date(dateDepart);
+  dateEcheance.setDate(dateDepart.getDate() + 14);
+
+  const deadline = dateEcheance.getTime();
   const diff = deadline - now;
   const overdue = diff < 0;
   const abs = Math.abs(diff);
