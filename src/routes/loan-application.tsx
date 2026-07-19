@@ -44,29 +44,30 @@ const initial: FormData = {
 
 const TOTAL = 14;
 
+const parseWhatsApp = (num: string) => {
+  if (!num) {
+    return { code: "+229", rest: "01" };
+  }
+  if (num.startsWith("+")) {
+    const match = num.match(/^(\+\d{1,4})(.*)$/);
+    if (match) {
+      const code = match[1];
+      let rest = match[2];
+      if (code === "+229" && !rest.startsWith("01")) {
+        rest = "01" + rest;
+      }
+      return { code, rest };
+    }
+  }
+  return { code: "+229", rest: num.startsWith("01") ? num : "01" + num };
+};
+
 function LoanApplication() {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
   const [data, setData] = useState<FormData>(initial);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
-
-  const [countryCode, setCountryCode] = useState("+229");
-  const [phoneRest, setPhoneRest] = useState("01");
-
-  useEffect(() => {
-    update("whatsapp_number", countryCode + phoneRest);
-  }, [countryCode, phoneRest]);
-
-  useEffect(() => {
-    if (data.whatsapp_number && data.whatsapp_number.startsWith("+")) {
-      const match = data.whatsapp_number.match(/^(\+\d+)(.*)$/);
-      if (match) {
-        setCountryCode(match[1]);
-        setPhoneRest(match[2].replace(/\s+/g, ""));
-      }
-    }
-  }, [data.whatsapp_number === initial.whatsapp_number]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -96,11 +97,12 @@ function LoanApplication() {
       case 5: return !!data.id_photo_url;
       case 6: return !!data.person_photo_url;
       case 7: {
-        const rest = phoneRest.replace(/\D/g, "");
-        if (countryCode === "+229") {
-          return rest.startsWith("01") && rest.length === 10;
+        const { code, rest } = parseWhatsApp(data.whatsapp_number);
+        const digits = rest.replace(/\D/g, "");
+        if (code === "+229") {
+          return digits.startsWith("01") && digits.length === 10;
         }
-        return rest.length >= 6;
+        return digits.length >= 6;
       }
       case 8: return Number(data.loan_amount) > 0;
       case 10: return data.guarantee.trim();
@@ -168,10 +170,6 @@ function LoanApplication() {
                 step={step} 
                 data={data} 
                 update={update} 
-                countryCode={countryCode}
-                setCountryCode={setCountryCode}
-                phoneRest={phoneRest}
-                setPhoneRest={setPhoneRest}
               />
             </motion.div>
           </AnimatePresence>
@@ -302,19 +300,11 @@ function UploadField({ value, onChange, folder, label }: { value: string; onChan
 function StepContent({ 
   step, 
   data, 
-  update,
-  countryCode,
-  setCountryCode,
-  phoneRest,
-  setPhoneRest
+  update
 }: { 
   step: number; 
   data: FormData; 
   update: <K extends keyof FormData>(k: K, v: FormData[K]) => void;
-  countryCode: string;
-  setCountryCode: (c: string) => void;
-  phoneRest: string;
-  setPhoneRest: (p: string) => void;
 }) {
   switch (step) {
     case 1: return (
@@ -374,60 +364,79 @@ function StepContent({
         </div>
       </>
     );
-    case 7: return (
-      <>
-        <StepTitle n="07" t="Numéro WhatsApp" />
-        <Label>Numéro WhatsApp *</Label>
-        <div className="flex gap-2">
-          <div className="w-1/3">
-            <Select 
-              value={countryCode} 
-              onChange={(e) => {
-                const newCode = e.target.value;
-                setCountryCode(newCode);
-                if (newCode === "+229") {
-                  setPhoneRest("01");
-                } else if (phoneRest === "01") {
-                  setPhoneRest("");
-                }
-              }}
-            >
-              <option value="+229">Bénin (+229)</option>
-              <option value="+228">Togo (+228)</option>
-              <option value="+225">Côte d'Ivoire (+225)</option>
-              <option value="+227">Niger (+227)</option>
-              <option value="+226">Burkina Faso (+226)</option>
-              <option value="+221">Sénégal (+221)</option>
-              <option value="+223">Mali (+223)</option>
-              <option value="+234">Nigeria (+234)</option>
-              <option value="+33">France (+33)</option>
-            </Select>
-          </div>
-          <div className="flex-1">
-            <Input 
-              value={phoneRest} 
-              onChange={(e) => {
-                let val = e.target.value.replace(/\D/g, "");
-                if (countryCode === "+229") {
-                  if (!val.startsWith("01")) {
-                    val = "01" + val;
+    case 7: {
+      const { code, rest } = parseWhatsApp(data.whatsapp_number);
+      return (
+        <>
+          <StepTitle n="07" t="Numéro WhatsApp" />
+          <Label>Numéro WhatsApp *</Label>
+          <div className="flex gap-2">
+            <div className="w-1/3">
+              <Select 
+                value={code} 
+                onChange={(e) => {
+                  const newCode = e.target.value;
+                  let newRest = rest;
+                  if (newCode === "+229") {
+                    if (!newRest.startsWith("01")) {
+                      newRest = "01" + newRest;
+                    }
+                    newRest = newRest.slice(0, 10);
+                  } else {
+                    if (newRest === "01") {
+                      newRest = "";
+                    }
                   }
-                  val = val.slice(0, 10);
-                }
-                setPhoneRest(val);
-              }} 
-              placeholder={countryCode === "+229" ? "01XXXXXXXX" : "Numéro de téléphone"} 
-            />
+                  update("whatsapp_number", newCode + newRest);
+                }}
+              >
+                <option value="+229">Bénin (+229)</option>
+                <option value="+228">Togo (+228)</option>
+                <option value="+225">Côte d'Ivoire (+225)</option>
+                <option value="+227">Niger (+227)</option>
+                <option value="+226">Burkina Faso (+226)</option>
+                <option value="+221">Sénégal (+221)</option>
+                <option value="+223">Mali (+223)</option>
+                <option value="+234">Nigeria (+234)</option>
+                <option value="+33">France (+33)</option>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <Input 
+                value={rest} 
+                onChange={(e) => {
+                  let val = e.target.value.replace(/\D/g, "");
+                  if (code === "+229") {
+                    if (!val.startsWith("01")) {
+                      val = "01" + val;
+                    }
+                    val = val.slice(0, 10);
+                  }
+                  update("whatsapp_number", code + val);
+                }} 
+                placeholder={code === "+229" ? "01XXXXXXXX" : "Numéro de téléphone"} 
+              />
+            </div>
           </div>
-        </div>
-        {countryCode === "+229" && (
-          <p className="mt-1.5 text-xs text-[#6b7280]">
-            Format Bénin : 01 suivi de 8 chiffres ({phoneRest.length}/10 chiffres)
-          </p>
-        )}
-        <p className="mt-4 text-sm text-[#6b7280]">⚠️ Vérifiez bien que ce numéro est actif sur WhatsApp — c'est par lui que nous vous contacterons.</p>
-      </>
-    );
+          {code === "+229" && (
+            <p className="mt-1.5 text-xs text-[#6b7280]">
+              Format Bénin : 01 suivi de 8 chiffres ({rest.length}/10 chiffres)
+            </p>
+          )}
+          {code === "+229" && rest.length > 2 && (rest.length !== 10 || !rest.startsWith("01")) && (
+            <p className="mt-1.5 text-xs text-red-500 font-medium">
+              ⚠️ Le numéro béninois doit comporter exactement 10 chiffres (commençant par 01).
+            </p>
+          )}
+          {code !== "+229" && rest.length > 0 && rest.length < 6 && (
+            <p className="mt-1.5 text-xs text-red-500 font-medium">
+              ⚠️ Le numéro doit comporter au moins 6 chiffres.
+            </p>
+          )}
+          <p className="mt-4 text-sm text-[#6b7280]">⚠️ Vérifiez bien que ce numéro est actif sur WhatsApp — c'est par lui que nous vous contacterons.</p>
+        </>
+      );
+    }
     case 8: {
       const amt = Number(data.loan_amount) || 0;
       return (
