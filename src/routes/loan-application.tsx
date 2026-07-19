@@ -404,11 +404,31 @@ function StepContent({
               <input 
                 type="text"
                 value={rest} 
+                onKeyDown={(e) => {
+                  if (code === "+229") {
+                    const start = e.currentTarget.selectionStart ?? 0;
+                    const end = e.currentTarget.selectionEnd ?? 0;
+                    if (e.key === "Backspace") {
+                      if (start === end && start <= 2) {
+                        e.preventDefault();
+                      } else if (start !== end && start < 2) {
+                        e.preventDefault();
+                      }
+                    } else if (e.key === "Delete") {
+                      if (start === end && start < 2) {
+                        e.preventDefault();
+                      } else if (start !== end && start < 2) {
+                        e.preventDefault();
+                      }
+                    }
+                  }
+                }}
                 onChange={(e) => {
                   let val = e.target.value.replace(/\D/g, "");
                   if (code === "+229") {
                     if (!val.startsWith("01")) {
                       val = "01" + val.replace(/^01?/, "");
+                      e.target.value = val;
                     }
                     update("whatsapp_number", code + val);
                   } else {
