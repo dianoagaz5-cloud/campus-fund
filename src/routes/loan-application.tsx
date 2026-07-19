@@ -46,20 +46,26 @@ const TOTAL = 14;
 
 const parseWhatsApp = (num: string) => {
   if (!num) {
-    return { code: "+229", rest: "01" };
+    return { code: "+229", rest: "" };
   }
   if (num.startsWith("+")) {
     const match = num.match(/^(\+\d{1,4})(.*)$/);
     if (match) {
       const code = match[1];
       let rest = match[2];
-      if (code === "+229" && !rest.startsWith("01")) {
-        rest = "01" + rest;
+      if (code === "+229") {
+        if (rest.startsWith("01")) {
+          rest = rest.slice(2);
+        }
       }
       return { code, rest };
     }
   }
-  return { code: "+229", rest: num.startsWith("01") ? num : "01" + num };
+  let rest = num;
+  if (rest.startsWith("01")) {
+    rest = rest.slice(2);
+  }
+  return { code: "+229", rest };
 };
 
 function LoanApplication() {
@@ -100,7 +106,7 @@ function LoanApplication() {
         const { code, rest } = parseWhatsApp(data.whatsapp_number);
         const digits = rest.replace(/\D/g, "");
         if (code === "+229") {
-          return digits.startsWith("01") && digits.length === 10;
+          return digits.length === 8;
         }
         return digits.length >= 6;
       }
@@ -376,18 +382,12 @@ function StepContent({
                 value={code} 
                 onChange={(e) => {
                   const newCode = e.target.value;
-                  let newRest = rest;
                   if (newCode === "+229") {
-                    if (!newRest.startsWith("01")) {
-                      newRest = "01" + newRest;
-                    }
-                    newRest = newRest.slice(0, 10);
+                    const val = rest.slice(0, 8);
+                    update("whatsapp_number", newCode + "01" + val);
                   } else {
-                    if (newRest === "01") {
-                      newRest = "";
-                    }
+                    update("whatsapp_number", newCode + rest);
                   }
-                  update("whatsapp_number", newCode + newRest);
                 }}
               >
                 <option value="+229">Bénin (+229)</option>
@@ -401,31 +401,39 @@ function StepContent({
                 <option value="+33">France (+33)</option>
               </Select>
             </div>
-            <div className="flex-1">
-              <Input 
+            <div className="flex-1 flex">
+              {code === "+229" && (
+                <span className="px-4 py-3 bg-[#f3f4f6] border border-r-0 border-[#e5e7eb] rounded-l-xl text-[#4b5563] font-semibold flex items-center select-none">
+                  01
+                </span>
+              )}
+              <input 
+                type="text"
                 value={rest} 
                 onChange={(e) => {
                   let val = e.target.value.replace(/\D/g, "");
                   if (code === "+229") {
-                    if (!val.startsWith("01")) {
-                      val = "01" + val;
-                    }
-                    val = val.slice(0, 10);
+                    val = val.slice(0, 8);
+                    update("whatsapp_number", code + "01" + val);
+                  } else {
+                    update("whatsapp_number", code + val);
                   }
-                  update("whatsapp_number", code + val);
                 }} 
-                placeholder={code === "+229" ? "01XXXXXXXX" : "Numéro de téléphone"} 
+                className={`w-full px-4 py-3 border border-[#e5e7eb] focus:border-[#c9a84c] focus:ring-2 focus:ring-[#c9a84c]/20 outline-none transition ${
+                  code === "+229" ? "rounded-r-xl rounded-l-none" : "rounded-xl"
+                }`}
+                placeholder={code === "+229" ? "XXXXXXXX" : "Numéro de téléphone"} 
               />
             </div>
           </div>
           {code === "+229" && (
             <p className="mt-1.5 text-xs text-[#6b7280]">
-              Format Bénin : 01 suivi de 8 chiffres ({rest.length}/10 chiffres)
+              Format Bénin : préfixe 01 (fixe) suivi de 8 chiffres ({rest.length}/8 saisis)
             </p>
           )}
-          {code === "+229" && rest.length > 2 && (rest.length !== 10 || !rest.startsWith("01")) && (
+          {code === "+229" && rest.length > 0 && rest.length !== 8 && (
             <p className="mt-1.5 text-xs text-red-500 font-medium">
-              ⚠️ Le numéro béninois doit comporter exactement 10 chiffres (commençant par 01).
+              ⚠️ Le numéro béninois doit comporter exactement 8 chiffres après le 01.
             </p>
           )}
           {code !== "+229" && rest.length > 0 && rest.length < 6 && (
