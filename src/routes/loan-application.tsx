@@ -46,7 +46,7 @@ const TOTAL = 14;
 
 const parseWhatsApp = (num: string) => {
   if (!num) {
-    return { code: "+229", rest: "" };
+    return { code: "+229", rest: "01" };
   }
   if (num.startsWith("+")) {
     const match = num.match(/^(\+\d{1,4})(.*)$/);
@@ -54,16 +54,16 @@ const parseWhatsApp = (num: string) => {
       const code = match[1];
       let rest = match[2];
       if (code === "+229") {
-        if (rest.startsWith("01")) {
-          rest = rest.slice(2);
+        if (!rest.startsWith("01")) {
+          rest = "01" + rest;
         }
       }
       return { code, rest };
     }
   }
   let rest = num;
-  if (rest.startsWith("01")) {
-    rest = rest.slice(2);
+  if (!rest.startsWith("01")) {
+    rest = "01" + rest;
   }
   return { code: "+229", rest };
 };
@@ -106,7 +106,7 @@ function LoanApplication() {
         const { code, rest } = parseWhatsApp(data.whatsapp_number);
         const digits = rest.replace(/\D/g, "");
         if (code === "+229") {
-          return digits.length === 8;
+          return digits.length === 10 && digits.startsWith("01");
         }
         return digits.length >= 6;
       }
@@ -383,10 +383,9 @@ function StepContent({
                 onChange={(e) => {
                   const newCode = e.target.value;
                   if (newCode === "+229") {
-                    const val = rest.slice(0, 8);
-                    update("whatsapp_number", newCode + "01" + val);
+                    update("whatsapp_number", newCode + "01" + rest.replace(/^01/, ""));
                   } else {
-                    update("whatsapp_number", newCode + rest);
+                    update("whatsapp_number", newCode + rest.replace(/^01/, ""));
                   }
                 }}
               >
@@ -402,36 +401,31 @@ function StepContent({
               </Select>
             </div>
             <div className="flex-1 flex">
-              {code === "+229" && (
-                <span className="px-4 py-3 bg-[#f3f4f6] border border-r-0 border-[#e5e7eb] rounded-l-xl text-[#4b5563] font-semibold flex items-center select-none">
-                  01
-                </span>
-              )}
               <input 
                 type="text"
                 value={rest} 
                 onChange={(e) => {
                   let val = e.target.value.replace(/\D/g, "");
                   if (code === "+229") {
-                    val = val.slice(0, 8);
-                    update("whatsapp_number", code + "01" + val);
+                    if (!val.startsWith("01")) {
+                      val = "01" + val.replace(/^01?/, "");
+                    }
+                    update("whatsapp_number", code + val);
                   } else {
                     update("whatsapp_number", code + val);
                   }
                 }} 
-                className={`w-full px-4 py-3 border border-[#e5e7eb] focus:border-[#c9a84c] focus:ring-2 focus:ring-[#c9a84c]/20 outline-none transition ${
-                  code === "+229" ? "rounded-r-xl rounded-l-none" : "rounded-xl"
-                }`}
-                placeholder={code === "+229" ? "XXXXXXXX" : "Numéro de téléphone"} 
+                className="w-full px-4 py-3 border border-[#e5e7eb] focus:border-[#c9a84c] focus:ring-2 focus:ring-[#c9a84c]/20 outline-none transition rounded-xl"
+                placeholder={code === "+229" ? "01XXXXXXXX" : "Numéro de téléphone"} 
               />
             </div>
           </div>
           {code === "+229" && (
             <p className="mt-1.5 text-xs text-[#6b7280]">
-              Format Bénin : préfixe 01 (fixe) suivi de 8 chiffres ({rest.length}/8 saisis)
+              Format Bénin : préfixe 01 (fixe) suivi de 8 chiffres ({(rest.length > 2 ? rest.length - 2 : 0)}/8 saisis)
             </p>
           )}
-          {code === "+229" && rest.length > 0 && rest.length !== 8 && (
+          {code === "+229" && rest.length > 2 && rest.length !== 10 && (
             <p className="mt-1.5 text-xs text-red-500 font-medium">
               ⚠️ Le numéro béninois doit comporter exactement 8 chiffres après le 01.
             </p>
