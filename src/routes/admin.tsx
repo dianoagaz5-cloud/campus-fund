@@ -711,7 +711,7 @@ function CapitalTab() {
       const monthLoans = loans.filter((l) => {
         const dateStr = l.request_date || l.created_at;
         const d = new Date(dateStr);
-        return d.getMonth() === m.index && d.getFullYear() === 2026;
+        return d.getMonth() === m.index && d.getFullYear() === new Date().getFullYear();
       });
       const netProfit = monthLoans
         .filter((l) => l.status === "reimbursed")
@@ -882,7 +882,7 @@ function CapitalTab() {
                   strokeWidth={2}
                   dot={false}
                   activeDot={false}
-                  name={`Objectif ${formatFCFA(Objectif_Capital)}`}
+                  name="Objectif cible"
                 />
                 <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: "15px" }} />
               </LineChart>
