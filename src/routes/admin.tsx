@@ -680,10 +680,18 @@ function CapitalTab() {
     return loans.filter((l) => l.status === "reimbursed").reduce((s, l) => s + Number(l.loan_amount || 0) * 0.3, 0);
   }, [loans]);
 
+  const Reinvested_Profit = useMemo(() => {
+    return (Benefices_Nets * pctReinvesti) / 100;
+  }, [Benefices_Nets, pctReinvesti]);
+
+  const Capital_Total = useMemo(() => {
+    return Capital_Actuel + Reinvested_Profit;
+  }, [Capital_Actuel, Reinvested_Profit]);
+
   const progressPercent = useMemo(() => {
     if (Objectif_Capital <= 0) return 0;
-    return Math.min((Capital_Actuel / Objectif_Capital) * 100, 100);
-  }, [Capital_Actuel, Objectif_Capital]);
+    return Math.min((Capital_Total / Objectif_Capital) * 100, 100);
+  }, [Capital_Total, Objectif_Capital]);
 
   const lineChartData = useMemo(() => {
     const months = [
@@ -698,50 +706,34 @@ function CapitalTab() {
       { name: "Décembre", index: 11 },
     ];
 
-    const loansByMonth = months.map((m) => {
+    const profitsByMonth: Record<number, number> = {};
+    months.forEach((m) => {
       const monthLoans = loans.filter((l) => {
-        const d = new Date(l.created_at);
+        const dateStr = l.request_date || l.created_at;
+        const d = new Date(dateStr);
         return d.getMonth() === m.index && d.getFullYear() === 2026;
       });
-
-      const lent = monthLoans.filter((l) => l.status !== "rejected").reduce((s, l) => s + Number(l.loan_amount || 0), 0);
-      const repaid = monthLoans.filter((l) => l.status === "reimbursed").reduce((s, l) => s + Number(l.repayment_amount || 0), 0);
-      const activeRepayments = monthLoans.filter((l) => l.status === "approved").reduce((s, l) => s + Number(l.repayment_amount || 0), 0);
-
-      return { mIndex: m.index, name: m.name, lent, repaid, activeRepayments };
+      const netProfit = monthLoans
+        .filter((l) => l.status === "reimbursed")
+        .reduce((s, l) => s + Number(l.loan_amount || 0) * 0.3, 0);
+      profitsByMonth[m.index] = (netProfit * pctReinvesti) / 100;
     });
 
     const values: Record<number, number> = {};
-    values[5] = Capital_Actuel;
-
-    for (let i = 4; i >= 3; i--) {
-      const nextMonthData = loansByMonth.find((m) => m.mIndex === i + 1);
-      const repaidNext = nextMonthData ? nextMonthData.repaid : 0;
-      const lentNext = nextMonthData ? nextMonthData.lent : 0;
-      values[i] = Math.max(0, values[i + 1] - repaidNext + lentNext);
-    }
-
-    for (let i = 6; i <= 11; i++) {
-      const prevVal = values[i - 1];
-      
-      let activeRepaidProjection = 0;
-      if (i === 6) {
-        const juneData = loansByMonth.find((m) => m.mIndex === 5);
-        activeRepaidProjection = juneData ? juneData.activeRepayments : 0;
+    months.forEach((m) => {
+      let cumProfit = 0;
+      for (let i = 3; i <= m.index; i++) {
+        cumProfit += profitsByMonth[i] || 0;
       }
-
-      const gapToGoal = Math.max(0, Objectif_Capital - prevVal);
-      const organicGrowth = gapToGoal * 0.15;
-
-      values[i] = Math.round(prevVal + activeRepaidProjection + organicGrowth);
-    }
+      values[m.index] = Capital_Actuel + cumProfit;
+    });
 
     return months.map((m) => ({
       name: m.name,
-      "Capital réel / projeté": values[m.index] || 0,
+      "Capital réel": values[m.index] || 0,
       "Objectif cible": Objectif_Capital,
     }));
-  }, [loans, Capital_Actuel, Objectif_Capital]);
+  }, [loans, Capital_Actuel, Objectif_Capital, pctReinvesti]);
 
   const barChartData = useMemo(() => {
     return [
@@ -782,7 +774,7 @@ function CapitalTab() {
           <div>
             <span className="text-xs uppercase text-[#6b7280]">Capital actuel disponible</span>
             <div className="text-3xl font-extrabold text-[#0d3d2e] mt-1">
-              {formatFCFA(Capital_Actuel)}
+              {formatFCFA(Capital_Total)}
             </div>
           </div>
         </div>
@@ -842,6 +834,10 @@ function CapitalTab() {
             <span className="text-[#6b7280]">Bénéfices nets (intérêts)</span>
             <span className="font-semibold text-[#7c3aed]">{formatFCFA(Benefices_Nets)}</span>
           </div>
+          <div className="flex justify-between py-3 border-t border-dashed border-[#0d3d2e]/10 font-bold">
+            <span className="text-[#0d3d2e]">Nouveau capital total (avec réinvestissements)</span>
+            <span className="text-[#0d3d2e]">{formatFCFA(Capital_Total)}</span>
+          </div>
         </div>
       </div>
 
@@ -871,12 +867,12 @@ function CapitalTab() {
                 <Tooltip formatter={(v: any) => formatFCFA(Number(v))} />
                 <Line
                   type="monotone"
-                  dataKey="Capital réel / projeté"
+                  dataKey="Capital réel"
                   stroke="#16a34a"
                   strokeWidth={3}
                   dot={{ r: 4 }}
                   activeDot={{ r: 6 }}
-                  name="Capital projeté"
+                  name="Capital réel"
                 />
                 <Line
                   type="monotone"

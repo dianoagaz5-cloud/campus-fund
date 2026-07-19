@@ -51,6 +51,23 @@ function LoanApplication() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
+  const [countryCode, setCountryCode] = useState("+229");
+  const [phoneRest, setPhoneRest] = useState("01");
+
+  useEffect(() => {
+    update("whatsapp_number", countryCode + phoneRest);
+  }, [countryCode, phoneRest]);
+
+  useEffect(() => {
+    if (data.whatsapp_number && data.whatsapp_number.startsWith("+")) {
+      const match = data.whatsapp_number.match(/^(\+\d+)(.*)$/);
+      if (match) {
+        setCountryCode(match[1]);
+        setPhoneRest(match[2].replace(/\s+/g, ""));
+      }
+    }
+  }, [data.whatsapp_number === initial.whatsapp_number]);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user?.email) {
@@ -78,7 +95,13 @@ function LoanApplication() {
       case 4: return data.id_doc_type && data.id_doc_number.trim();
       case 5: return !!data.id_photo_url;
       case 6: return !!data.person_photo_url;
-      case 7: return data.whatsapp_number.trim();
+      case 7: {
+        const rest = phoneRest.replace(/\D/g, "");
+        if (countryCode === "+229") {
+          return rest.startsWith("01") && rest.length === 10;
+        }
+        return rest.length >= 6;
+      }
       case 8: return Number(data.loan_amount) > 0;
       case 10: return data.guarantee.trim();
       case 11: return !!data.guarantee_photo_url;
@@ -141,7 +164,15 @@ function LoanApplication() {
               exit={{ opacity: 0, x: direction * -60 }}
               transition={{ duration: 0.3 }}
             >
-              <StepContent step={step} data={data} update={update} />
+              <StepContent 
+                step={step} 
+                data={data} 
+                update={update} 
+                countryCode={countryCode}
+                setCountryCode={setCountryCode}
+                phoneRest={phoneRest}
+                setPhoneRest={setPhoneRest}
+              />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -268,7 +299,23 @@ function UploadField({ value, onChange, folder, label }: { value: string; onChan
   );
 }
 
-function StepContent({ step, data, update }: { step: number; data: FormData; update: <K extends keyof FormData>(k: K, v: FormData[K]) => void }) {
+function StepContent({ 
+  step, 
+  data, 
+  update,
+  countryCode,
+  setCountryCode,
+  phoneRest,
+  setPhoneRest
+}: { 
+  step: number; 
+  data: FormData; 
+  update: <K extends keyof FormData>(k: K, v: FormData[K]) => void;
+  countryCode: string;
+  setCountryCode: (c: string) => void;
+  phoneRest: string;
+  setPhoneRest: (p: string) => void;
+}) {
   switch (step) {
     case 1: return (
       <>
@@ -307,7 +354,7 @@ function StepContent({ step, data, update }: { step: number; data: FormData; upd
               <option>CNI</option><option>Passeport</option><option>Carte étudiant</option><option>Attestation</option>
             </Select>
           </div>
-          <div><Label>Numéro du document *</Label><Input value={data.id_doc_number} onChange={(e) => update("id_doc_number", e.target.value)} /></div>
+          <div><Label>Numéro du document *</Label><Input value={data.id_doc_number} onChange={(e) => update("id_doc_number", e.target.value.replace(/\D/g, ""))} /></div>
         </div>
       </>
     );
@@ -331,7 +378,53 @@ function StepContent({ step, data, update }: { step: number; data: FormData; upd
       <>
         <StepTitle n="07" t="Numéro WhatsApp" />
         <Label>Numéro WhatsApp *</Label>
-        <Input value={data.whatsapp_number} onChange={(e) => update("whatsapp_number", e.target.value)} placeholder="+229 ..." />
+        <div className="flex gap-2">
+          <div className="w-1/3">
+            <Select 
+              value={countryCode} 
+              onChange={(e) => {
+                const newCode = e.target.value;
+                setCountryCode(newCode);
+                if (newCode === "+229") {
+                  setPhoneRest("01");
+                } else if (phoneRest === "01") {
+                  setPhoneRest("");
+                }
+              }}
+            >
+              <option value="+229">Bénin (+229)</option>
+              <option value="+228">Togo (+228)</option>
+              <option value="+225">Côte d'Ivoire (+225)</option>
+              <option value="+227">Niger (+227)</option>
+              <option value="+226">Burkina Faso (+226)</option>
+              <option value="+221">Sénégal (+221)</option>
+              <option value="+223">Mali (+223)</option>
+              <option value="+234">Nigeria (+234)</option>
+              <option value="+33">France (+33)</option>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <Input 
+              value={phoneRest} 
+              onChange={(e) => {
+                let val = e.target.value.replace(/\D/g, "");
+                if (countryCode === "+229") {
+                  if (!val.startsWith("01")) {
+                    val = "01" + val;
+                  }
+                  val = val.slice(0, 10);
+                }
+                setPhoneRest(val);
+              }} 
+              placeholder={countryCode === "+229" ? "01XXXXXXXX" : "Numéro de téléphone"} 
+            />
+          </div>
+        </div>
+        {countryCode === "+229" && (
+          <p className="mt-1.5 text-xs text-[#6b7280]">
+            Format Bénin : 01 suivi de 8 chiffres ({phoneRest.length}/10 chiffres)
+          </p>
+        )}
         <p className="mt-4 text-sm text-[#6b7280]">⚠️ Vérifiez bien que ce numéro est actif sur WhatsApp — c'est par lui que nous vous contacterons.</p>
       </>
     );
