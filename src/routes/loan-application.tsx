@@ -44,9 +44,21 @@ const initial: FormData = {
 
 const TOTAL = 14;
 
+const CODES = ["+229", "+228", "+225", "+227", "+226", "+221", "+223", "+234", "+33"];
+
 const parseWhatsApp = (num: string) => {
   if (!num) {
     return { code: "+229", rest: "01" };
+  }
+  const foundCode = CODES.find((c) => num.startsWith(c));
+  if (foundCode) {
+    let rest = num.slice(foundCode.length);
+    if (foundCode === "+229") {
+      if (!rest.startsWith("01")) {
+        rest = "01" + rest;
+      }
+    }
+    return { code: foundCode, rest };
   }
   if (num.startsWith("+")) {
     const match = num.match(/^(\+\d{1,4})(.*)$/);
